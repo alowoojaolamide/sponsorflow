@@ -128,6 +128,14 @@ export function computeCompletionPercent(full: FullProfile): number {
   return Math.round((filled / checks.length) * 100);
 }
 
+export async function getExistingNormalizedNames(supabase: DB, userId: string): Promise<Set<string>> {
+  const { data } = await supabase
+    .from("companies")
+    .select("normalized_name")
+    .eq("user_id", userId);
+  return new Set((data ?? []).map((c) => c.normalized_name).filter((n): n is string => !!n));
+}
+
 export async function getCompanies(supabase: DB, userId: string): Promise<Tables<"companies">[]> {
   const { data, error } = await supabase
     .from("companies")

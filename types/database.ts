@@ -379,6 +379,9 @@ export type Database = {
           campaign_tag: string | null;
           normalized_name: string | null;
           external_id: string | null;
+          career_page: string | null;
+          personalization_hook: string | null;
+          sponsor_status: string | null;
           status: string;
           created_at: string;
           updated_at: string;
@@ -393,6 +396,9 @@ export type Database = {
           campaign_tag?: string | null;
           normalized_name?: string | null;
           external_id?: string | null;
+          career_page?: string | null;
+          personalization_hook?: string | null;
+          sponsor_status?: string | null;
           status?: string;
           created_at?: string;
           updated_at?: string;
@@ -407,6 +413,9 @@ export type Database = {
           campaign_tag?: string | null;
           normalized_name?: string | null;
           external_id?: string | null;
+          career_page?: string | null;
+          personalization_hook?: string | null;
+          sponsor_status?: string | null;
           status?: string;
           created_at?: string;
           updated_at?: string;
