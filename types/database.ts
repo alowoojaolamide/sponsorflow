@@ -101,6 +101,9 @@ export type Database = {
           writing_tone: string;
           requires_sponsorship: boolean;
           target_salary_gbp: number | null;
+          availability: string | null;
+          remote_preference: string | null;
+          example_phrases: string | null;
           onboarding_complete: boolean;
           profile_complete_percent: number;
           created_at: string;
@@ -120,6 +123,9 @@ export type Database = {
           writing_tone?: string;
           requires_sponsorship?: boolean;
           target_salary_gbp?: number | null;
+          availability?: string | null;
+          remote_preference?: string | null;
+          example_phrases?: string | null;
           onboarding_complete?: boolean;
           profile_complete_percent?: number;
           created_at?: string;
@@ -139,6 +145,9 @@ export type Database = {
           writing_tone?: string;
           requires_sponsorship?: boolean;
           target_salary_gbp?: number | null;
+          availability?: string | null;
+          remote_preference?: string | null;
+          example_phrases?: string | null;
           onboarding_complete?: boolean;
           profile_complete_percent?: number;
           created_at?: string;
