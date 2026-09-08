@@ -37,10 +37,18 @@ function loadEnv() {
   return env;
 }
 
+function realValue(...candidates) {
+  return candidates.find((v) => v && !v.startsWith('your-') && !v.includes('YOUR-'));
+}
+
 const env = loadEnv();
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_SERVICE_ROLE_KEY || 
-                    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabaseUrl = realValue(process.env.NEXT_PUBLIC_SUPABASE_URL, env.NEXT_PUBLIC_SUPABASE_URL);
+const supabaseKey = realValue(
+  process.env.SUPABASE_SERVICE_ROLE_KEY,
+  env.SUPABASE_SERVICE_ROLE_KEY,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+);
 
 const REQUIRED_TABLES = [
   'users',
