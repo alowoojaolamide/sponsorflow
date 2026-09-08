@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { loginUser } from "@/lib/auth";
 
 export async function POST(req: Request) {
   try {
@@ -9,11 +10,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Email and password are required" }, { status: 400 });
     }
 
-    // Prompt 3 will implement complete password check & JWT session issuance
+    const { user, session, error } = await loginUser(email, password);
+
+    if (error || !session || !user) {
+      return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
+    }
+
     return NextResponse.json({
       success: true,
-      token: "demo-token",
-      user_id: "demo-user-id",
+      user_id: user.id,
+      expires_at: session.expires_at,
     });
   } catch (err: unknown) {
     return NextResponse.json(

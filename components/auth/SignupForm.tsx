@@ -39,7 +39,9 @@ export function SignupForm() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to create account");
-      window.location.href = "/login?verified=pending";
+      window.location.href = data.email_confirmation_required
+        ? "/login?verified=pending"
+        : "/profile";
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "An error occurred";
       setError(msg);

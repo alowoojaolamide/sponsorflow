@@ -24,7 +24,7 @@ export function LoginForm() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Invalid email or password");
-      window.location.href = "/";
+      window.location.href = "/profile";
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to log in";
       setError(msg);
