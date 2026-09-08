@@ -56,6 +56,19 @@ export async function loginUser(email: string, password: string) {
   return { user: data?.user ?? null, session: data?.session ?? null, error };
 }
 
+export async function exchangeOAuthCode(code: string) {
+  const supabase = createSupabaseRouteClient();
+  const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+
+  if (error || !data.session || !data.user) {
+    return { user: null, session: null, error };
+  }
+
+  await ensureUserRecord(supabase, data.user.id, data.user.email!);
+
+  return { user: data.user, session: data.session, error: null };
+}
+
 export async function logoutUser() {
   const supabase = createSupabaseRouteClient();
   const { error } = await supabase.auth.signOut();

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { exchangeOAuthCode } from "@/lib/auth";
 
 export async function POST(req: Request) {
   try {
@@ -9,11 +10,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Authorization code missing" }, { status: 400 });
     }
 
-    // Prompt 4 will handle OAuth 2.0 exchange with Google & Supabase session creation
-    return NextResponse.json({
-      success: true,
-      token: "demo-google-token",
-    });
+    const { user, error } = await exchangeOAuthCode(code);
+
+    if (error || !user) {
+      return NextResponse.json(
+        { error: error?.message ?? "Google sign-in failed" },
+        { status: 400 }
+      );
+    }
+
+    return NextResponse.json({ success: true, user_id: user.id });
   } catch (err: unknown) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Internal Server Error" },

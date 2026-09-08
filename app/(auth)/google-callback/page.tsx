@@ -19,7 +19,7 @@ function CallbackHandler() {
         .then((res) => res.json())
         .then((data) => {
           if (data.success) {
-            router.push("/");
+            router.push("/profile");
           } else {
             router.push("/login?error=" + encodeURIComponent(data.error || "Authentication failed"));
           }

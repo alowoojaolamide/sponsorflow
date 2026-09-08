@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { supabase } from "@/lib/supabase";
 
 export function SignupForm() {
   const [email, setEmail] = useState("");
@@ -12,6 +13,13 @@ export function SignupForm() {
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  const handleGoogleSignIn = async () => {
+    await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: `${window.location.origin}/google-callback` },
+    });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -120,7 +128,7 @@ export function SignupForm() {
         type="button"
         variant="outline-light"
         className="w-full flex items-center justify-center gap-2"
-        onClick={() => { window.location.href = "/api/auth/google"; }}
+        onClick={handleGoogleSignIn}
       >
         <svg className="w-4 h-4" viewBox="0 0 24 24">
           <path
