@@ -1,0 +1,59 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { Database } from "@/types/database";
+import { getValidAccessToken, sendGmailMessage } from "@/lib/gmail";
+import { checkAndConsumeSendLimit } from "@/lib/rate-limit";
+
+type DB = SupabaseClient<Database>;
+
+export type SendResult =
+  | { ok: true; emailId: string; gmailMessageId: string }
+  | { ok: false; emailId: string; error: string };
+
+export async function sendOutreachEmail(supabase: DB, userId: string, emailId: string): Promise<SendResult> {
+  const { data: email, error: fetchError } = await supabase
+    .from("outreach_emails")
+    .select("*")
+    .eq("id", emailId)
+    .eq("user_id", userId)
+    .single();
+
+  if (fetchError || !email) {
+    return { ok: false, emailId, error: "Email not found" };
+  }
+
+  if (email.status !== "ready_to_send" && email.status !== "approved") {
+    return { ok: false, emailId, error: `Email is not ready to send (status: ${email.status})` };
+  }
+
+  const gmail = await getValidAccessToken(supabase, userId);
+  if (!gmail) {
+    return { ok: false, emailId, error: "Gmail is not connected. Connect Gmail from your profile page first." };
+  }
+
+  const limit = await checkAndConsumeSendLimit(supabase, userId);
+  if (!limit.allowed) {
+    return { ok: false, emailId, error: limit.reason };
+  }
+
+  try {
+    const gmailMessageId = await sendGmailMessage(
+      gmail.accessToken,
+      gmail.connection.gmail_email,
+      email.to_email,
+      email.subject,
+      email.body
+    );
+
+    await supabase
+      .from("outreach_emails")
+      .update({ status: "sent", sent_at: new Date().toISOString(), delivery_status: "sent" })
+      .eq("id", emailId);
+
+    await supabase.from("email_events").insert({ outreach_email_id: emailId, event_type: "sent" });
+
+    return { ok: true, emailId, gmailMessageId };
+  } catch (err: unknown) {
+    await supabase.from("outreach_emails").update({ delivery_status: "failed" }).eq("id", emailId);
+    return { ok: false, emailId, error: err instanceof Error ? err.message : "Send failed" };
+  }
+}

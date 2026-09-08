@@ -1,10 +1,19 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
 export function Header() {
+  const [limit, setLimit] = useState<{ daily_used: number; daily_limit: number } | null>(null);
+
+  useEffect(() => {
+    fetch("/api/emails/rate-limit")
+      .then((res) => (res.ok ? res.json() : null))
+      .then(setLimit)
+      .catch(() => {});
+  }, []);
+
   return (
     <header className="h-16 border-b border-hairline-light bg-canvas-light px-6 flex items-center justify-between sticky top-0 z-30">
       <div className="flex items-center gap-4">
@@ -20,7 +29,7 @@ export function Header() {
 
       <div className="flex items-center gap-3">
         <div className="hidden md:flex items-center text-xs text-shade-50 font-medium mr-2">
-          Daily limit: <span className="text-ink font-semibold ml-1">0/20 sent</span>
+          Daily limit: <span className="text-ink font-semibold ml-1">{limit ? `${limit.daily_used}/${limit.daily_limit}` : "—"} sent</span>
         </div>
         <Link href="/profile">
           <Button variant="outline-light" size="sm">
