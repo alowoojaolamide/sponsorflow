@@ -515,6 +515,8 @@ export type Database = {
           approved_by_user: boolean;
           approved_at: string | null;
           user_edits: string | null;
+          gmail_message_id: string | null;
+          gmail_thread_id: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -538,6 +540,8 @@ export type Database = {
           approved_by_user?: boolean;
           approved_at?: string | null;
           user_edits?: string | null;
+          gmail_message_id?: string | null;
+          gmail_thread_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -561,6 +565,8 @@ export type Database = {
           approved_by_user?: boolean;
           approved_at?: string | null;
           user_edits?: string | null;
+          gmail_message_id?: string | null;
+          gmail_thread_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };

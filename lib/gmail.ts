@@ -147,14 +147,14 @@ function base64UrlEncode(str: string): string {
     .replace(/=+$/, "");
 }
 
-/** Sends an email via the Gmail API using a valid access token. Returns the Gmail message id. */
+/** Sends an email via the Gmail API using a valid access token. */
 export async function sendGmailMessage(
   accessToken: string,
   fromEmail: string,
   toEmail: string,
   subject: string,
   body: string
-): Promise<string> {
+): Promise<{ id: string; threadId: string }> {
   const rawMessage = [
     `From: ${fromEmail}`,
     `To: ${toEmail}`,
@@ -179,5 +179,108 @@ export async function sendGmailMessage(
   }
 
   const data = await res.json();
-  return data.id as string;
+  return { id: data.id as string, threadId: data.threadId as string };
+}
+
+/** Registers (or renews) a Gmail push notification watch on the user's inbox. */
+export async function watchGmailInbox(
+  accessToken: string
+): Promise<{ historyId: string; expiration: string }> {
+  const topicName = process.env.GMAIL_PUBSUB_TOPIC;
+  if (!topicName || topicName.includes("your-gcp-project")) {
+    throw new Error("GMAIL_PUBSUB_TOPIC is not configured.");
+  }
+
+  const res = await fetch("https://www.googleapis.com/gmail/v1/users/me/watch", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ topicName, labelIds: ["INBOX"] }),
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Gmail watch registration failed: ${body}`);
+  }
+
+  const data = await res.json();
+  return { historyId: data.historyId, expiration: new Date(Number(data.expiration)).toISOString() };
+}
+
+type GmailHistoryMessage = { id: string; threadId: string };
+
+/** Lists new inbox messages since a given historyId. */
+export async function listHistorySince(
+  accessToken: string,
+  startHistoryId: string
+): Promise<{ messages: GmailHistoryMessage[]; newHistoryId: string }> {
+  const params = new URLSearchParams({
+    startHistoryId,
+    historyTypes: "messageAdded",
+    labelId: "INBOX",
+  });
+
+  const res = await fetch(`https://www.googleapis.com/gmail/v1/users/me/history?${params}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+
+  if (!res.ok) {
+    // A 404 typically means startHistoryId is too old (mailbox history expired).
+    return { messages: [], newHistoryId: startHistoryId };
+  }
+
+  const data = await res.json();
+  const messages: GmailHistoryMessage[] = (data.history ?? []).flatMap(
+    (h: { messagesAdded?: { message: GmailHistoryMessage }[] }) =>
+      (h.messagesAdded ?? []).map((m) => m.message)
+  );
+
+  return { messages, newHistoryId: data.historyId ?? startHistoryId };
+}
+
+export type GmailMessageDetail = {
+  threadId: string;
+  from: string;
+  subject: string;
+  body: string;
+  inReplyTo: string | null;
+};
+
+function decodeBase64Url(data: string): string {
+  return Buffer.from(data.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf-8");
+}
+
+function extractPlainTextBody(payload: {
+  mimeType?: string;
+  body?: { data?: string };
+  parts?: { mimeType?: string; body?: { data?: string } }[];
+}): string {
+  if (payload.mimeType === "text/plain" && payload.body?.data) {
+    return decodeBase64Url(payload.body.data);
+  }
+  const plainPart = payload.parts?.find((p) => p.mimeType === "text/plain");
+  if (plainPart?.body?.data) return decodeBase64Url(plainPart.body.data);
+  const htmlPart = payload.parts?.find((p) => p.mimeType === "text/html");
+  if (htmlPart?.body?.data) return decodeBase64Url(htmlPart.body.data).replace(/<[^>]+>/g, " ");
+  return "";
+}
+
+export async function getGmailMessage(accessToken: string, messageId: string): Promise<GmailMessageDetail> {
+  const res = await fetch(
+    `https://www.googleapis.com/gmail/v1/users/me/messages/${messageId}?format=full`,
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+  if (!res.ok) throw new Error("Failed to fetch Gmail message");
+  const data = await res.json();
+
+  const headers: { name: string; value: string }[] = data.payload?.headers ?? [];
+  const getHeader = (name: string) =>
+    headers.find((h) => h.name.toLowerCase() === name.toLowerCase())?.value ?? null;
+
+  return {
+    threadId: data.threadId,
+    from: getHeader("From") ?? "",
+    subject: getHeader("Subject") ?? "",
+    body: extractPlainTextBody(data.payload ?? {}),
+    inReplyTo: getHeader("In-Reply-To"),
+  };
 }

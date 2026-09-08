@@ -36,7 +36,7 @@ export async function sendOutreachEmail(supabase: DB, userId: string, emailId: s
   }
 
   try {
-    const gmailMessageId = await sendGmailMessage(
+    const sent = await sendGmailMessage(
       gmail.accessToken,
       gmail.connection.gmail_email,
       email.to_email,
@@ -46,12 +46,18 @@ export async function sendOutreachEmail(supabase: DB, userId: string, emailId: s
 
     await supabase
       .from("outreach_emails")
-      .update({ status: "sent", sent_at: new Date().toISOString(), delivery_status: "sent" })
+      .update({
+        status: "sent",
+        sent_at: new Date().toISOString(),
+        delivery_status: "sent",
+        gmail_message_id: sent.id,
+        gmail_thread_id: sent.threadId,
+      })
       .eq("id", emailId);
 
     await supabase.from("email_events").insert({ outreach_email_id: emailId, event_type: "sent" });
 
-    return { ok: true, emailId, gmailMessageId };
+    return { ok: true, emailId, gmailMessageId: sent.id };
   } catch (err: unknown) {
     await supabase.from("outreach_emails").update({ delivery_status: "failed" }).eq("id", emailId);
     return { ok: false, emailId, error: err instanceof Error ? err.message : "Send failed" };
