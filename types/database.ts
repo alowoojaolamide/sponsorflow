@@ -795,6 +795,56 @@ export type Database = {
           }
         ];
       };
+      gmail_connections: {
+        Row: {
+          id: string;
+          user_id: string;
+          gmail_email: string;
+          access_token: string;
+          refresh_token: string;
+          token_expires_at: string;
+          scope: string | null;
+          watch_expiration: string | null;
+          history_id: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          gmail_email: string;
+          access_token: string;
+          refresh_token: string;
+          token_expires_at: string;
+          scope?: string | null;
+          watch_expiration?: string | null;
+          history_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          gmail_email?: string;
+          access_token?: string;
+          refresh_token?: string;
+          token_expires_at?: string;
+          scope?: string | null;
+          watch_expiration?: string | null;
+          history_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "gmail_connections_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: true;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
       analytics_by_industry: {
         Row: {
           id: string;

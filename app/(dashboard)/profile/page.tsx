@@ -1,10 +1,36 @@
-import React from "react";
+"use client";
+
+import React, { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { User, FileText, Briefcase, Award } from "lucide-react";
+import { User, Award } from "lucide-react";
+import { GmailConnectionCard } from "@/components/dashboard/GmailConnectionCard";
+
+type ProfileData = {
+  profile: {
+    professional_summary: string | null;
+    target_job_title: string | null;
+    location: string | null;
+    target_salary_gbp: number | null;
+    requires_sponsorship: boolean;
+    onboarding_complete: boolean;
+    profile_complete_percent: number;
+  } | null;
+  industries: { industry: string; years_experience: number | null }[];
+};
 
 export default function ProfilePage() {
+  const [data, setData] = useState<ProfileData | null>(null);
+
+  useEffect(() => {
+    fetch("/api/profile")
+      .then((res) => res.json())
+      .then(setData);
+  }, []);
+
+  const profile = data?.profile;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -13,10 +39,16 @@ export default function ProfilePage() {
           <p className="text-sm text-shade-50">
             Your verified experience and positioning angles used to personalize every outreach email.
           </p>
+          {profile && (
+            <p className="text-xs text-shade-40 mt-1">
+              Profile: {profile.profile_complete_percent}% complete
+              {profile.onboarding_complete && " ✓"}
+            </p>
+          )}
         </div>
         <Link href="/onboarding/step-1">
           <Button variant="primary" size="sm">
-            Edit 10-Step Profile
+            {profile?.onboarding_complete ? "Edit 10-Step Profile" : "Complete your profile →"}
           </Button>
         </Link>
       </div>
@@ -29,14 +61,21 @@ export default function ProfilePage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 text-sm text-shade-60">
-            <p>
-              Product Designer with 4+ years of experience leading UX/UI across high-growth Fintech and SaaS environments. Proven track record reducing complex workflow friction by 40% and translating business requirements into intuitive consumer and enterprise experiences.
-            </p>
-            <div className="pt-2 flex flex-wrap gap-2">
-              <span className="px-2.5 py-1 rounded-pill bg-aloe-10 text-ink text-xs font-medium">Fintech (4 yrs)</span>
-              <span className="px-2.5 py-1 rounded-pill bg-pistachio-10 text-ink text-xs font-medium">SaaS (2 yrs)</span>
-              <span className="px-2.5 py-1 rounded-pill bg-slate-100 text-ink text-xs font-medium">UK Visa Sponsorship Required</span>
-            </div>
+            <p>{profile?.professional_summary || "Complete onboarding to add your professional summary."}</p>
+            {data && data.industries.length > 0 && (
+              <div className="pt-2 flex flex-wrap gap-2">
+                {data.industries.map((i) => (
+                  <span key={i.industry} className="px-2.5 py-1 rounded-pill bg-aloe-10 text-ink text-xs font-medium capitalize">
+                    {i.industry} {i.years_experience ? `(${i.years_experience} yrs)` : ""}
+                  </span>
+                ))}
+                {profile?.requires_sponsorship && (
+                  <span className="px-2.5 py-1 rounded-pill bg-slate-100 text-ink text-xs font-medium">
+                    UK Visa Sponsorship Required
+                  </span>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -49,18 +88,24 @@ export default function ProfilePage() {
           <CardContent className="space-y-3 text-sm">
             <div>
               <span className="text-xs text-shade-40 uppercase font-semibold">Target Title</span>
-              <p className="font-semibold text-ink">Senior Product / UX Designer</p>
+              <p className="font-semibold text-ink">{profile?.target_job_title || "—"}</p>
             </div>
             <div>
               <span className="text-xs text-shade-40 uppercase font-semibold">Location Target</span>
-              <p className="font-medium text-ink">London (Hybrid / Remote)</p>
+              <p className="font-medium text-ink">{profile?.location || "—"}</p>
             </div>
             <div>
               <span className="text-xs text-shade-40 uppercase font-semibold">Salary Expectation</span>
-              <p className="font-medium text-ink">£65,000 - £85,000 GBP</p>
+              <p className="font-medium text-ink">
+                {profile?.target_salary_gbp ? `£${profile.target_salary_gbp.toLocaleString()} GBP` : "—"}
+              </p>
             </div>
           </CardContent>
         </Card>
+
+        <Suspense fallback={null}>
+          <GmailConnectionCard />
+        </Suspense>
       </div>
     </div>
   );
