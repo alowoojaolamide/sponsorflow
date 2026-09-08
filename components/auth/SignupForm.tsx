@@ -49,7 +49,7 @@ export function SignupForm() {
       if (!res.ok) throw new Error(data.error || "Failed to create account");
       window.location.href = data.email_confirmation_required
         ? "/login?verified=pending"
-        : "/profile";
+        : "/dashboard";
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "An error occurred";
       setError(msg);

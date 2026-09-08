@@ -7,7 +7,7 @@ import { LayoutDashboard, UserCheck, Building2, Mail, BarChart3 } from "lucide-r
 import { cn } from "@/lib/utils";
 
 const navigation = [
-  { name: "Overview", href: "/", icon: LayoutDashboard },
+  { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
   { name: "Profile & Setup", href: "/profile", icon: UserCheck },
   { name: "Target Companies", href: "/companies", icon: Building2 },
   { name: "Outreach & Review", href: "/emails", icon: Mail },

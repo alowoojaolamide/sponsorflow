@@ -338,7 +338,7 @@ export function OnboardingWizard({ step }: { step: number }) {
     try {
       if (step === TOTAL_STEPS) {
         await save(true);
-        router.push("/profile");
+        router.push("/dashboard");
         return;
       }
       await save(false);

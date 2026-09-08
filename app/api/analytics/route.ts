@@ -1,11 +1,16 @@
 import { NextResponse } from "next/server";
+import { createSupabaseRouteClient } from "@/lib/supabase-server";
+import { getCurrentUser } from "@/lib/auth";
+import { getDashboardSummary } from "@/lib/analytics";
 
 export async function GET() {
-  return NextResponse.json({
-    emails_sent_today: 0,
-    daily_limit: 20,
-    open_rate: 0,
-    reply_rate: 0,
-    interviews_scheduled: 0,
-  });
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const supabase = createSupabaseRouteClient();
+  const summary = await getDashboardSummary(supabase, user.id);
+
+  return NextResponse.json(summary);
 }
