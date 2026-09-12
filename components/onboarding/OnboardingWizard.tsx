@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
+import { Sparkles } from "lucide-react";
 
 const TOTAL_STEPS = 10;
 
@@ -101,6 +102,34 @@ function toggle(list: string[], value: string): string[] {
   return list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
 }
 
+type AutofillResult = {
+  profile: {
+    location: string | null;
+    years_experience: number | null;
+    target_job_title: string | null;
+    linkedin_url: string | null;
+    portfolio_url: string | null;
+    professional_summary: string | null;
+    unique_thing: string | null;
+  };
+  industries: {
+    industry: string;
+    years_experience: number | null;
+    experience_description: string | null;
+    problems_solved: string | null;
+  }[];
+  skills: { design: string[]; tools: string[]; other: string[] };
+  projects: {
+    project_name: string;
+    company_name: string | null;
+    year: number | null;
+    role: string | null;
+    industry: string | null;
+    description: string | null;
+    impact: string | null;
+  }[];
+};
+
 export function OnboardingWizard({ step }: { step: number }) {
   const router = useRouter();
   const [state, setState] = useState<WizardState>(initialState);
@@ -185,6 +214,59 @@ export function OnboardingWizard({ step }: { step: number }) {
 
   function set<K extends keyof WizardState>(key: K, value: WizardState[K]) {
     setState((s) => ({ ...s, [key]: value }));
+  }
+
+  function mergeAutofillResult(result: AutofillResult) {
+    setState((s) => {
+      const fintech = result.industries.find((i) => i.industry === "fintech");
+      const healthcare = result.industries.find((i) => i.industry === "healthcare");
+      const extractedDesign = result.skills.design.filter((sk) => DESIGN_SKILLS.includes(sk));
+      const extractedTools = result.skills.tools.filter((sk) => TOOLS.includes(sk));
+      const leftover = [
+        ...result.skills.design.filter((sk) => !DESIGN_SKILLS.includes(sk)),
+        ...result.skills.tools.filter((sk) => !TOOLS.includes(sk)),
+        ...result.skills.other,
+      ];
+
+      return {
+        ...s,
+        location: result.profile.location ?? s.location,
+        years_experience: result.profile.years_experience?.toString() ?? s.years_experience,
+        target_job_title: result.profile.target_job_title ?? s.target_job_title,
+        linkedin_url: result.profile.linkedin_url ?? s.linkedin_url,
+        portfolio_url: result.profile.portfolio_url ?? s.portfolio_url,
+        professional_summary: result.profile.professional_summary ?? s.professional_summary,
+        unique_thing: result.profile.unique_thing ?? s.unique_thing,
+        industries: Array.from(new Set([...s.industries, ...result.industries.map((i) => i.industry)])),
+        industry_years: {
+          ...s.industry_years,
+          ...Object.fromEntries(
+            result.industries
+              .filter((i) => i.years_experience != null)
+              .map((i) => [i.industry, String(i.years_experience)])
+          ),
+        },
+        design_skills: Array.from(new Set([...s.design_skills, ...extractedDesign])),
+        tools: Array.from(new Set([...s.tools, ...extractedTools])),
+        other_skills: [s.other_skills, leftover.join(", ")].filter(Boolean).join(", "),
+        projects:
+          result.projects.length > 0
+            ? result.projects.map((p) => ({
+                project_name: p.project_name ?? "",
+                company_name: p.company_name ?? "",
+                year: p.year?.toString() ?? "",
+                description: p.description ?? "",
+                role: p.role ?? "",
+                industry: p.industry ?? "",
+                impact: p.impact ?? "",
+              }))
+            : s.projects,
+        fintech_experience: fintech?.experience_description ?? s.fintech_experience,
+        fintech_problems: fintech?.problems_solved ?? s.fintech_problems,
+        healthcare_experience: healthcare?.experience_description ?? s.healthcare_experience,
+        healthcare_problems: healthcare?.problems_solved ?? s.healthcare_problems,
+      };
+    });
   }
 
   function validate(): string | null {
@@ -374,6 +456,8 @@ export function OnboardingWizard({ step }: { step: number }) {
         </div>
       </div>
 
+      {step === 1 && <AutofillPanel onResult={mergeAutofillResult} />}
+
       <Card className="p-8">
         {error && (
           <div className="p-3 mb-4 rounded-md bg-red-50 border border-red-200 text-sm text-red-700">
@@ -393,6 +477,108 @@ export function OnboardingWizard({ step }: { step: number }) {
         </Button>
       </div>
     </div>
+  );
+}
+
+function AutofillPanel({ onResult }: { onResult: (result: AutofillResult) => void }) {
+  const [open, setOpen] = useState(false);
+  const [resumeFile, setResumeFile] = useState<File | null>(null);
+  const [portfolioUrl, setPortfolioUrl] = useState("");
+  const [linkedinText, setLinkedinText] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+
+  async function handleAutofill() {
+    setError(null);
+    setIsSubmitting(true);
+    try {
+      const formData = new FormData();
+      if (resumeFile) formData.append("resume", resumeFile);
+      if (portfolioUrl) formData.append("portfolio_url", portfolioUrl);
+      if (linkedinText) formData.append("linkedin_text", linkedinText);
+
+      const res = await fetch("/api/profile/autofill", { method: "POST", body: formData });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Autofill failed");
+
+      onResult(data);
+      setSuccess(true);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Autofill failed");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <Card className="p-6 border-primary/30 bg-aloe-10/10">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex items-start gap-3">
+          <Sparkles className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-semibold text-ink">Skip the typing — autofill from your CV</p>
+            <p className="text-xs text-shade-50 mt-0.5">
+              Upload your resume (and optionally a portfolio link or LinkedIn summary) and AI will
+              pre-fill your background, skills, and projects below. You still review and edit every
+              step before saving — nothing is invented that isn&apos;t in your documents.
+            </p>
+          </div>
+        </div>
+        <Button type="button" variant="outline-light" size="sm" onClick={() => setOpen((o) => !o)}>
+          {open ? "Close" : "Try it"}
+        </Button>
+      </div>
+
+      {open && (
+        <div className="mt-4 space-y-3 border-t border-hairline-light pt-4">
+          {error && (
+            <div className="p-2.5 rounded-md bg-red-50 border border-red-200 text-xs text-red-700">
+              {error}
+            </div>
+          )}
+          {success && !error && (
+            <div className="p-2.5 rounded-md bg-emerald-50 border border-emerald-200 text-xs text-emerald-700">
+              Profile pre-filled. Click Next to review each step.
+            </div>
+          )}
+
+          <div>
+            <label className="block text-sm font-medium text-ink mb-1.5">Resume / CV (PDF or DOCX)</label>
+            <input
+              type="file"
+              accept=".pdf,.docx"
+              onChange={(e) => setResumeFile(e.target.files?.[0] ?? null)}
+              className="text-sm"
+            />
+          </div>
+
+          <Input
+            label="Portfolio URL (optional)"
+            placeholder="https://yourportfolio.com"
+            value={portfolioUrl}
+            onChange={(e) => setPortfolioUrl(e.target.value)}
+          />
+
+          <TextArea
+            label="Paste your LinkedIn 'About' section (optional)"
+            value={linkedinText}
+            onChange={setLinkedinText}
+            rows={4}
+          />
+
+          <Button
+            type="button"
+            variant="primary"
+            size="sm"
+            disabled={isSubmitting || (!resumeFile && !portfolioUrl && !linkedinText)}
+            onClick={handleAutofill}
+          >
+            {isSubmitting ? "Reading your documents..." : "Autofill My Profile"}
+          </Button>
+        </div>
+      )}
+    </Card>
   );
 }
 
