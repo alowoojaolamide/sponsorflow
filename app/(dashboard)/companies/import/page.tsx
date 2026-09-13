@@ -26,10 +26,19 @@ export default function CompanyImportPage() {
   async function handleFile(f: File) {
     setError(null);
     setResult(null);
-    setFile(f);
 
     const text = await f.text();
     const { companies } = parseCSV(text);
+
+    if (companies.length === 0) {
+      setError(
+        "Couldn't find any company rows in that file. Make sure it's a CSV with a header row and at least one column of company names."
+      );
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
+    setFile(f);
     setPreview(companies);
 
     const existing = await fetch("/api/companies")

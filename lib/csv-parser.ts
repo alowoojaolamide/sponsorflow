@@ -20,25 +20,41 @@ export type ParseResult = {
 const COLUMN_MAP: Record<string, keyof Omit<ParsedCompany, "normalized_name">> = {
   "company name": "company_name",
   "company": "company_name",
+  "companies": "company_name",
   "employer": "company_name",
+  "employer name": "company_name",
   "organisation name": "company_name",
   "organization name": "company_name",
   "org name": "company_name",
+  "org": "company_name",
+  "name": "company_name",
+  "business name": "company_name",
+  "firm": "company_name",
+  "firm name": "company_name",
+  "sponsor": "company_name",
+  "sponsor name": "company_name",
   "website": "website",
   "url": "website",
   "site": "website",
+  "web": "website",
+  "domain": "website",
   "industry": "industry",
   "sector": "industry",
+  "category": "industry",
   "career page": "career_page",
   "careers page": "career_page",
   "careers url": "career_page",
+  "careers": "career_page",
   "personalization hook": "personalization_hook",
   "hook": "personalization_hook",
   "notes": "personalization_hook",
+  "note": "personalization_hook",
+  "description": "personalization_hook",
   "type & rating": "sponsor_status",
   "sponsor status": "sponsor_status",
   "status": "sponsor_status",
   "rating": "sponsor_status",
+  "type": "sponsor_status",
 };
 
 /** Mirrors the Postgres normalize_company_name() function for client/server preview. */
@@ -117,6 +133,14 @@ export function parseCSV(text: string): ParseResult {
   const dataRows = rows.slice(1);
 
   const columnAssignments = headers.map((h) => mapColumn(h));
+
+  // If nothing matched company_name, fall back to treating the first column
+  // as the company name — most simple CSVs list it first even under an
+  // unrecognized header (e.g. "Business", "Client", a bare "1").
+  if (columnAssignments.length > 0 && !columnAssignments.includes("company_name")) {
+    columnAssignments[0] = "company_name";
+  }
+
   const unrecognized_columns = headers.filter((h, i) => !columnAssignments[i]);
 
   const companies: ParsedCompany[] = dataRows
