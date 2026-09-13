@@ -1,5 +1,7 @@
-import Anthropic from "@anthropic-ai/sdk";
 import type { Tables } from "@/types/database";
+import { callClaude, parseClaudeJson, isClaudeConfigured } from "@/lib/claude-client";
+
+export { isClaudeConfigured };
 
 export type EmailDraft = {
   subject: string;
@@ -7,15 +9,6 @@ export type EmailDraft = {
   positioning_angle: string;
   confidence: number;
 };
-
-function realKey() {
-  const key = process.env.ANTHROPIC_API_KEY;
-  return key && !key.startsWith("sk-ant-api03-...") && key !== "your-anthropic-api-key" ? key : null;
-}
-
-export function isClaudeConfigured(): boolean {
-  return !!realKey();
-}
 
 function pickPositioning(
   companyIndustry: string | null,
@@ -73,31 +66,15 @@ export async function generateEmailDraft(
   projects: Tables<"user_projects">[],
   company: Tables<"companies">
 ): Promise<EmailDraft> {
-  const key = realKey();
-  if (!key) {
-    throw new Error(
-      "ANTHROPIC_API_KEY is not configured. Add a real key to .env.local to enable AI email generation."
-    );
-  }
-
   const positioning = pickPositioning(company.industry, industries);
   const project = projects[0] ?? null;
   const prompt = buildPrompt(profile, positioning, project, company);
 
-  const client = new Anthropic({ apiKey: key });
-  const message = await client.messages.create({
-    model: "claude-sonnet-4-5",
-    max_tokens: 600,
-    messages: [{ role: "user", content: prompt }],
-  });
-
-  const textBlock = message.content.find((b) => b.type === "text");
-  const raw = textBlock && "text" in textBlock ? textBlock.text : "";
+  const raw = await callClaude(prompt, 600);
 
   let parsed: EmailDraft;
   try {
-    const jsonMatch = raw.match(/\{[\s\S]*\}/);
-    parsed = JSON.parse(jsonMatch ? jsonMatch[0] : raw);
+    parsed = parseClaudeJson<EmailDraft>(raw);
   } catch {
     throw new Error("Claude returned an unparseable response. Try regenerating.");
   }
