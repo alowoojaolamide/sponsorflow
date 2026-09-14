@@ -5,6 +5,40 @@
 :root {
   --font-inter: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-display: "NeueHaasGrotesk Display", "Inter Display", -apple-system, BlinkMacSystemFont, sans-serif;
+
+  /* Semantic color tokens as RGB channel triples so Tailwind's /opacity
+     modifiers keep working (rgb(var(--x) / <alpha-value>)). Redefined
+     under .dark below — every component using bg-canvas-cream, text-ink,
+     etc. gets dark mode for free without per-component changes. */
+  --canvas-cream: 251 251 245;
+  --canvas-light: 255 255 255;
+  --ink: 0 0 0;
+  --hairline-light: 228 228 231;
+  --primary: 0 0 0;
+  --on-primary: 255 255 255;
+  --shade-30: 212 212 216;
+  --shade-40: 161 161 170;
+  --shade-50: 113 113 122;
+  --shade-60: 82 82 91;
+  --shade-70: 63 63 70;
+  --aloe-10: 193 251 212;
+  --pistachio-10: 212 249 224;
+}
+
+.dark {
+  --canvas-cream: 17 18 20;
+  --canvas-light: 26 28 31;
+  --ink: 237 237 240;
+  --hairline-light: 45 47 51;
+  --primary: 237 237 240;
+  --on-primary: 17 18 20;
+  --shade-30: 63 63 70;
+  --shade-40: 124 124 133;
+  --shade-50: 154 154 164;
+  --shade-60: 182 182 191;
+  --shade-70: 212 212 218;
+  --aloe-10: 156 232 180;
+  --pistachio-10: 176 224 190;
 }
 
 /* Global character signature from shopifydesignskills.md */
@@ -13,11 +47,12 @@
 }
 
 body {
-  color: #000000;
-  background: #ffffff;
+  color: rgb(var(--ink));
+  background: rgb(var(--canvas-cream));
   font-family: var(--font-inter);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
 
 /* Base button styles honoring the non-negotiable pill requirement */
@@ -34,11 +69,11 @@ body {
 
 /* Button variants from design spec */
 .btn-primary-pill {
-  background-color: #000000;
-  color: #ffffff;
+  background-color: rgb(var(--primary));
+  color: rgb(var(--on-primary));
 }
 .btn-primary-pill:hover {
-  background-color: #3f3f46;
+  background-color: rgb(var(--shade-70));
 }
 
 .btn-outline-dark {
@@ -52,12 +87,12 @@ body {
 }
 
 .btn-outline-light {
-  background-color: #ffffff;
-  border: 1px solid #000000;
-  color: #000000;
+  background-color: rgb(var(--canvas-light));
+  border: 1px solid rgb(var(--ink));
+  color: rgb(var(--ink));
 }
 .btn-outline-light:hover {
-  background-color: #f4f4f5;
+  background-color: rgb(var(--hairline-light));
 }
 
 .btn-aloe-pill {

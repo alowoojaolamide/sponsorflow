@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
 
 export function Header() {
   const [limit, setLimit] = useState<{ daily_used: number; daily_limit: number } | null>(null);
@@ -31,6 +32,7 @@ export function Header() {
         <div className="hidden md:flex items-center text-xs text-shade-50 font-medium mr-2">
           Daily limit: <span className="text-ink font-semibold ml-1">{limit ? `${limit.daily_used}/${limit.daily_limit}` : "—"} sent</span>
         </div>
+        <ThemeToggle />
         <Link href="/profile">
           <Button variant="outline-light" size="sm">
             Profile

@@ -1,6 +1,11 @@
 import type { Config } from "tailwindcss";
 
+function withOpacity(cssVar: string) {
+  return `rgb(var(${cssVar}) / <alpha-value>)`;
+}
+
 const config: Config = {
+  darkMode: "class",
   content: [
     "./pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
@@ -9,30 +14,34 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        primary: "#000000",
-        ink: "#000000",
-        "on-primary": "#ffffff",
+        // Theme-aware tokens (see app/globals.css :root / .dark) — these
+        // automatically respond to the dark mode toggle everywhere.
+        primary: withOpacity("--primary"),
+        ink: withOpacity("--ink"),
+        "on-primary": withOpacity("--on-primary"),
+        "canvas-light": withOpacity("--canvas-light"),
+        "canvas-cream": withOpacity("--canvas-cream"),
+        "hairline-light": withOpacity("--hairline-light"),
+        "aloe-10": withOpacity("--aloe-10"),
+        "pistachio-10": withOpacity("--pistachio-10"),
+        shade: {
+          30: withOpacity("--shade-30"),
+          40: withOpacity("--shade-40"),
+          50: withOpacity("--shade-50"),
+          60: withOpacity("--shade-60"),
+          70: withOpacity("--shade-70"),
+        },
+        // Fixed (not theme-aware) — the marketing landing page's cinematic
+        // dark hero keeps this look regardless of the light/dark toggle.
         "on-dark": "#ffffff",
         "canvas-night": "#000000",
         "canvas-night-elevated": "#0a0a0a",
         "surface-elevated-dark": "#1e2c31",
-        "canvas-light": "#ffffff",
-        "canvas-cream": "#fbfbf5",
-        "hairline-light": "#e4e4e7",
         "hairline-dark": "#1e2c31",
-        "aloe-10": "#c1fbd4",
-        "pistachio-10": "#d4f9e0",
         "link-cool-1": "#9dabad",
         "link-cool-2": "#9797a2",
         "link-cool-3": "#bdbdca",
         "link-mint": "#99b3ad",
-        shade: {
-          30: "#d4d4d8",
-          40: "#a1a1aa",
-          50: "#71717a",
-          60: "#52525b",
-          70: "#3f3f46",
-        },
       },
       borderRadius: {
         xs: "4px",

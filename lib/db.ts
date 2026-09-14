@@ -178,19 +178,45 @@ export async function getExistingNormalizedNamesAmong(
   return result;
 }
 
+const SORTABLE_COLUMNS = ["company_name", "industry", "status", "created_at"] as const;
+type SortableColumn = (typeof SORTABLE_COLUMNS)[number];
+
+export function isSortableColumn(value: string): value is SortableColumn {
+  return (SORTABLE_COLUMNS as readonly string[]).includes(value);
+}
+
 export async function getCompanies(
   supabase: DB,
   userId: string,
-  options: { limit?: number; offset?: number } = {}
+  options: {
+    limit?: number;
+    offset?: number;
+    search?: string;
+    status?: string;
+    industry?: string;
+    sort?: SortableColumn;
+    order?: "asc" | "desc";
+  } = {}
 ): Promise<{ companies: Tables<"companies">[]; total: number }> {
   const limit = options.limit ?? 50;
   const offset = options.offset ?? 0;
+  const sort = options.sort && isSortableColumn(options.sort) ? options.sort : "created_at";
+  const ascending = options.order === "asc";
 
-  const { data, error, count } = await supabase
-    .from("companies")
-    .select("*", { count: "exact" })
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false })
+  let query = supabase.from("companies").select("*", { count: "exact" }).eq("user_id", userId);
+
+  if (options.search) {
+    query = query.ilike("company_name", `%${options.search}%`);
+  }
+  if (options.status) {
+    query = query.eq("status", options.status);
+  }
+  if (options.industry) {
+    query = query.eq("industry", options.industry);
+  }
+
+  const { data, error, count } = await query
+    .order(sort, { ascending, nullsFirst: false })
     .range(offset, offset + limit - 1);
 
   if (error) return { companies: [], total: 0 };

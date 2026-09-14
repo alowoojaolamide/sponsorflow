@@ -4,7 +4,17 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Upload, Building2, ExternalLink, Search, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  Upload,
+  Building2,
+  ExternalLink,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
+} from "lucide-react";
 
 type Company = {
   id: string;
@@ -16,7 +26,10 @@ type Company = {
   status: string;
 };
 
+type SortColumn = "company_name" | "industry" | "status";
+
 const PAGE_SIZE = 50;
+const STATUS_OPTIONS = ["new", "contacted", "replied", "interview", "offer", "rejected"];
 
 export default function CompaniesPage() {
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -26,18 +39,57 @@ export default function CompaniesPage() {
   const [scanning, setScanning] = useState<string | null>(null);
   const [scanResult, setScanResult] = useState<Record<string, string>>({});
 
+  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [sortColumn, setSortColumn] = useState<SortColumn>("company_name");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+
+  // Debounce the search box so we don't fire a request per keystroke.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setSearch(searchInput);
+      setPage(0);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [searchInput]);
+
   useEffect(() => {
     setLoading(true);
-    fetch(`/api/companies?limit=${PAGE_SIZE}&offset=${page * PAGE_SIZE}`)
+    const params = new URLSearchParams({
+      limit: String(PAGE_SIZE),
+      offset: String(page * PAGE_SIZE),
+      sort: sortColumn,
+      order: sortOrder,
+    });
+    if (search) params.set("search", search);
+    if (statusFilter) params.set("status", statusFilter);
+
+    fetch(`/api/companies?${params.toString()}`)
       .then((res) => res.json())
       .then((data) => {
         setCompanies(data.companies ?? []);
         setTotal(data.total ?? 0);
       })
       .finally(() => setLoading(false));
-  }, [page]);
+  }, [page, search, statusFilter, sortColumn, sortOrder]);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  function toggleSort(column: SortColumn) {
+    if (sortColumn === column) {
+      setSortOrder((o) => (o === "asc" ? "desc" : "asc"));
+    } else {
+      setSortColumn(column);
+      setSortOrder("asc");
+    }
+    setPage(0);
+  }
+
+  function SortIcon({ column }: { column: SortColumn }) {
+    if (sortColumn !== column) return <ArrowUpDown className="w-3 h-3 text-shade-30" />;
+    return sortOrder === "asc" ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />;
+  }
 
   async function handleFindRoles(companyId: string) {
     setScanning(companyId);
@@ -90,30 +142,74 @@ export default function CompaniesPage() {
       </div>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="space-y-4">
           <CardTitle className="text-base flex items-center gap-2">
             <Building2 className="w-4 h-4 text-emerald-600" /> Companies ({total.toLocaleString()})
           </CardTitle>
+
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1 max-w-sm">
+              <Search className="w-4 h-4 text-shade-40 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Search company name..."
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                className="w-full min-h-[40px] pl-9 pr-3 rounded-md border border-hairline-light bg-canvas-light text-sm text-ink placeholder:text-shade-40 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+            </div>
+            <select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setPage(0);
+              }}
+              className="min-h-[40px] rounded-md border border-hairline-light bg-canvas-light px-3 text-sm text-ink capitalize focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            >
+              <option value="">All statuses</option>
+              {STATUS_OPTIONS.map((s) => (
+                <option key={s} value={s} className="capitalize">
+                  {s}
+                </option>
+              ))}
+            </select>
+          </div>
         </CardHeader>
         <CardContent>
           {loading ? (
             <p className="text-sm text-shade-50 py-8 text-center">Loading...</p>
           ) : companies.length === 0 ? (
             <div className="text-center py-12 space-y-3">
-              <p className="text-sm text-shade-50">No companies yet.</p>
-              <Link href="/companies/import">
-                <Button variant="primary" size="sm">Import your first CSV</Button>
-              </Link>
+              <p className="text-sm text-shade-50">
+                {search || statusFilter ? "No companies match your filters." : "No companies yet."}
+              </p>
+              {!search && !statusFilter && (
+                <Link href="/companies/import">
+                  <Button variant="primary" size="sm">Import your first CSV</Button>
+                </Link>
+              )}
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead className="border-b border-hairline-light text-xs font-semibold text-shade-40 uppercase">
                   <tr>
-                    <th className="pb-3">Company</th>
-                    <th className="pb-3">Industry</th>
+                    <th className="pb-3">
+                      <button className="flex items-center gap-1 hover:text-ink" onClick={() => toggleSort("company_name")}>
+                        Company <SortIcon column="company_name" />
+                      </button>
+                    </th>
+                    <th className="pb-3">
+                      <button className="flex items-center gap-1 hover:text-ink" onClick={() => toggleSort("industry")}>
+                        Industry <SortIcon column="industry" />
+                      </button>
+                    </th>
                     <th className="pb-3">Personalization Hook</th>
-                    <th className="pb-3">Status</th>
+                    <th className="pb-3">
+                      <button className="flex items-center gap-1 hover:text-ink" onClick={() => toggleSort("status")}>
+                        Status <SortIcon column="status" />
+                      </button>
+                    </th>
                     <th className="pb-3 text-right">Action</th>
                   </tr>
                 </thead>

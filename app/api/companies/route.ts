@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createSupabaseRouteClient } from "@/lib/supabase-server";
 import { getCurrentUser } from "@/lib/auth";
-import { getCompanies } from "@/lib/db";
+import { getCompanies, isSortableColumn } from "@/lib/db";
 
 export async function GET(req: Request) {
   const user = await getCurrentUser();
@@ -12,9 +12,23 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const limit = Math.min(Number(searchParams.get("limit")) || 50, 2000);
   const offset = Number(searchParams.get("offset")) || 0;
+  const search = searchParams.get("search") || undefined;
+  const status = searchParams.get("status") || undefined;
+  const industry = searchParams.get("industry") || undefined;
+  const sortParam = searchParams.get("sort") || undefined;
+  const sort = sortParam && isSortableColumn(sortParam) ? sortParam : undefined;
+  const order = searchParams.get("order") === "asc" ? "asc" : "desc";
 
   const supabase = createSupabaseRouteClient();
-  const { companies, total } = await getCompanies(supabase, user.id, { limit, offset });
+  const { companies, total } = await getCompanies(supabase, user.id, {
+    limit,
+    offset,
+    search,
+    status,
+    industry,
+    sort,
+    order,
+  });
 
   return NextResponse.json({ companies, total, limit, offset });
 }
