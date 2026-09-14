@@ -4,12 +4,13 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Upload, Building2, ExternalLink } from "lucide-react";
+import { Upload, Building2, ExternalLink, Search } from "lucide-react";
 
 type Company = {
   id: string;
   company_name: string;
   website: string | null;
+  career_page: string | null;
   industry: string | null;
   personalization_hook: string | null;
   status: string;
@@ -18,6 +19,8 @@ type Company = {
 export default function CompaniesPage() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
+  const [scanning, setScanning] = useState<string | null>(null);
+  const [scanResult, setScanResult] = useState<Record<string, string>>({});
 
   useEffect(() => {
     fetch("/api/companies")
@@ -25,6 +28,33 @@ export default function CompaniesPage() {
       .then((data) => setCompanies(data.companies ?? []))
       .finally(() => setLoading(false));
   }, []);
+
+  async function handleFindRoles(companyId: string) {
+    setScanning(companyId);
+    setScanResult((r) => ({ ...r, [companyId]: "" }));
+    try {
+      const res = await fetch("/api/jobs/discover", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ company_id: companyId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Scan failed");
+      setScanResult((r) => ({
+        ...r,
+        [companyId]:
+          data.found > 0
+            ? `${data.found} role${data.found === 1 ? "" : "s"} found`
+            : data.no_career_page
+            ? "No career page on file"
+            : "No matching roles found",
+      }));
+    } catch (err: unknown) {
+      setScanResult((r) => ({ ...r, [companyId]: err instanceof Error ? err.message : "Scan failed" }));
+    } finally {
+      setScanning(null);
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -36,6 +66,11 @@ export default function CompaniesPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Link href="/jobs">
+            <Button variant="outline-light" size="sm" className="gap-2">
+              <Search className="w-4 h-4" /> Open Roles
+            </Button>
+          </Link>
           <Link href="/companies/import">
             <Button variant="outline-light" size="sm" className="gap-2">
               <Upload className="w-4 h-4" /> Import CSV
@@ -89,11 +124,23 @@ export default function CompaniesPage() {
                             </a>
                           )}
                         </div>
+                        {scanResult[c.id] && (
+                          <p className="text-[11px] text-shade-40 mt-0.5">{scanResult[c.id]}</p>
+                        )}
                       </td>
                       <td className="py-3.5 text-shade-60">{c.industry ?? "—"}</td>
                       <td className="py-3.5 text-shade-50 text-xs">{c.personalization_hook ?? "—"}</td>
                       <td className="py-3.5 text-xs capitalize">{c.status}</td>
-                      <td className="py-3.5 text-right">
+                      <td className="py-3.5 text-right space-x-1 whitespace-nowrap">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-xs"
+                          disabled={scanning === c.id}
+                          onClick={() => handleFindRoles(c.id)}
+                        >
+                          {scanning === c.id ? "Scanning..." : "Find Roles"}
+                        </Button>
                         <Link href={`/emails?company_id=${c.id}`}>
                           <Button variant="ghost" size="sm" className="text-xs">
                             Draft Email

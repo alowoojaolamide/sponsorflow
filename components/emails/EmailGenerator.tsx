@@ -19,16 +19,20 @@ export function EmailGenerator({
   onGenerate,
   isGenerating,
   initialCompanyId,
+  initialJobTitle,
+  initialJobUrl,
 }: {
   onGenerate: (params: GenerateParams) => void;
   isGenerating: boolean;
   initialCompanyId?: string;
+  initialJobTitle?: string;
+  initialJobUrl?: string;
 }) {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [selected, setSelected] = useState(initialCompanyId ?? "");
-  const [showJobFields, setShowJobFields] = useState(false);
-  const [jobTitle, setJobTitle] = useState("");
-  const [jobUrl, setJobUrl] = useState("");
+  const [showJobFields, setShowJobFields] = useState(!!initialJobTitle);
+  const [jobTitle, setJobTitle] = useState(initialJobTitle ?? "");
+  const [jobUrl, setJobUrl] = useState(initialJobUrl ?? "");
   const [jobDescription, setJobDescription] = useState("");
 
   useEffect(() => {

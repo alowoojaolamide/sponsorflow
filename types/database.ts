@@ -807,6 +807,69 @@ export type Database = {
           }
         ];
       };
+      job_postings: {
+        Row: {
+          id: string;
+          user_id: string;
+          company_id: string;
+          source: string;
+          external_id: string | null;
+          title: string;
+          url: string | null;
+          location: string | null;
+          description: string | null;
+          status: string;
+          discovered_at: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          company_id: string;
+          source: string;
+          external_id?: string | null;
+          title: string;
+          url?: string | null;
+          location?: string | null;
+          description?: string | null;
+          status?: string;
+          discovered_at?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          company_id?: string;
+          source?: string;
+          external_id?: string | null;
+          title?: string;
+          url?: string | null;
+          location?: string | null;
+          description?: string | null;
+          status?: string;
+          discovered_at?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "job_postings_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "job_postings_company_id_fkey";
+            columns: ["company_id"];
+            isOneToOne: false;
+            referencedRelation: "companies";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
       gmail_connections: {
         Row: {
           id: string;

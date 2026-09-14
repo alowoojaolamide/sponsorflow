@@ -3,13 +3,14 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, UserCheck, Building2, Mail, BarChart3 } from "lucide-react";
+import { LayoutDashboard, UserCheck, Building2, Search, Mail, BarChart3 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navigation = [
   { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
   { name: "Profile & Setup", href: "/profile", icon: UserCheck },
   { name: "Target Companies", href: "/companies", icon: Building2 },
+  { name: "Open Roles", href: "/jobs", icon: Search },
   { name: "Outreach & Review", href: "/emails", icon: Mail },
   { name: "Analytics & Pipeline", href: "/analytics", icon: BarChart3 },
 ];

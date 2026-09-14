@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 function EmailsPageInner() {
   const searchParams = useSearchParams();
   const initialCompanyId = searchParams.get("company_id") ?? undefined;
+  const initialJobTitle = searchParams.get("job_title") ?? undefined;
+  const initialJobUrl = searchParams.get("job_url") ?? undefined;
 
   const [draft, setDraft] = useState<EmailDraftView | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -177,7 +179,13 @@ function EmailsPageInner() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
-        <EmailGenerator onGenerate={generate} isGenerating={isGenerating} initialCompanyId={initialCompanyId} />
+        <EmailGenerator
+          onGenerate={generate}
+          isGenerating={isGenerating}
+          initialCompanyId={initialCompanyId}
+          initialJobTitle={initialJobTitle}
+          initialJobUrl={initialJobUrl}
+        />
         <EmailApprovalUI
           draft={draft}
           onApprove={handleApprove}
