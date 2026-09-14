@@ -3,16 +3,20 @@ import { createSupabaseRouteClient } from "@/lib/supabase-server";
 import { getCurrentUser } from "@/lib/auth";
 import { getCompanies } from "@/lib/db";
 
-export async function GET() {
+export async function GET(req: Request) {
   const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const supabase = createSupabaseRouteClient();
-  const companies = await getCompanies(supabase, user.id);
+  const { searchParams } = new URL(req.url);
+  const limit = Math.min(Number(searchParams.get("limit")) || 50, 2000);
+  const offset = Number(searchParams.get("offset")) || 0;
 
-  return NextResponse.json({ companies, total: companies.length });
+  const supabase = createSupabaseRouteClient();
+  const { companies, total } = await getCompanies(supabase, user.id, { limit, offset });
+
+  return NextResponse.json({ companies, total, limit, offset });
 }
 
 export async function POST(req: Request) {

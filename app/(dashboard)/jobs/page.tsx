@@ -26,7 +26,7 @@ export default function JobsPage() {
     setLoading(true);
     const [jobsRes, companiesRes] = await Promise.all([
       fetch("/api/jobs").then((r) => r.json()),
-      fetch("/api/companies").then((r) => r.json()),
+      fetch("/api/companies?limit=2000").then((r) => r.json()),
     ]);
     setJobs((jobsRes.jobs ?? []).filter((j: JobPosting) => j.status !== "dismissed"));
     setCompanyNames(

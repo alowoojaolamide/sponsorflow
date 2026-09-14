@@ -29,6 +29,7 @@ export function EmailGenerator({
   initialJobUrl?: string;
 }) {
   const [companies, setCompanies] = useState<Company[]>([]);
+  const [totalCompanies, setTotalCompanies] = useState(0);
   const [selected, setSelected] = useState(initialCompanyId ?? "");
   const [showJobFields, setShowJobFields] = useState(!!initialJobTitle);
   const [jobTitle, setJobTitle] = useState(initialJobTitle ?? "");
@@ -36,9 +37,12 @@ export function EmailGenerator({
   const [jobDescription, setJobDescription] = useState("");
 
   useEffect(() => {
-    fetch("/api/companies")
+    fetch("/api/companies?limit=2000")
       .then((res) => res.json())
-      .then((data) => setCompanies(data.companies ?? []));
+      .then((data) => {
+        setCompanies(data.companies ?? []);
+        setTotalCompanies(data.total ?? 0);
+      });
   }, []);
 
   return (
@@ -69,6 +73,11 @@ export function EmailGenerator({
               </option>
             ))}
           </select>
+          {totalCompanies > companies.length && (
+            <p className="text-[11px] text-shade-40 mt-1">
+              Showing the {companies.length.toLocaleString()} most recent of {totalCompanies.toLocaleString()} companies. Use &quot;Draft Email&quot; from the Companies list to target an older one.
+            </p>
+          )}
         </div>
 
         <button

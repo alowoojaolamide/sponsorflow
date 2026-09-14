@@ -136,15 +136,65 @@ export async function getExistingNormalizedNames(supabase: DB, userId: string): 
   return new Set((data ?? []).map((c) => c.normalized_name).filter((n): n is string => !!n));
 }
 
-export async function getCompanies(supabase: DB, userId: string): Promise<Tables<"companies">[]> {
-  const { data, error } = await supabase
-    .from("companies")
-    .select("*")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false });
+/**
+ * Like getExistingNormalizedNames, but scoped to a specific set of candidate
+ * names via .in(). Used for batched imports so each batch's dedup check
+ * stays cheap regardless of how large the user's total company list gets,
+ * instead of re-fetching every existing name on every batch.
+ *
+ * .in() filters are sent as GET query params, so a single call is chunked
+ * to a safe URL length — a 1000-name .in() list can exceed common proxy
+ * URL-length limits, which silently drops/errors the query rather than
+ * failing loudly.
+ */
+const IN_FILTER_CHUNK_SIZE = 150;
 
-  if (error) return [];
-  return data || [];
+export async function getExistingNormalizedNamesAmong(
+  supabase: DB,
+  userId: string,
+  candidates: string[]
+): Promise<Set<string>> {
+  if (candidates.length === 0) return new Set();
+
+  const unique = Array.from(new Set(candidates));
+  const result = new Set<string>();
+
+  for (let i = 0; i < unique.length; i += IN_FILTER_CHUNK_SIZE) {
+    const chunk = unique.slice(i, i + IN_FILTER_CHUNK_SIZE);
+    const { data, error } = await supabase
+      .from("companies")
+      .select("normalized_name")
+      .eq("user_id", userId)
+      .in("normalized_name", chunk);
+
+    if (error) {
+      throw new Error(`Duplicate check failed: ${error.message}`);
+    }
+    for (const row of data ?? []) {
+      if (row.normalized_name) result.add(row.normalized_name);
+    }
+  }
+
+  return result;
+}
+
+export async function getCompanies(
+  supabase: DB,
+  userId: string,
+  options: { limit?: number; offset?: number } = {}
+): Promise<{ companies: Tables<"companies">[]; total: number }> {
+  const limit = options.limit ?? 50;
+  const offset = options.offset ?? 0;
+
+  const { data, error, count } = await supabase
+    .from("companies")
+    .select("*", { count: "exact" })
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+
+  if (error) return { companies: [], total: 0 };
+  return { companies: data || [], total: count ?? 0 };
 }
 
 export async function getOutreachEmails(

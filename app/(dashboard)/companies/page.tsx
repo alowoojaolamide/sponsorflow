@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Upload, Building2, ExternalLink, Search } from "lucide-react";
+import { Upload, Building2, ExternalLink, Search, ChevronLeft, ChevronRight } from "lucide-react";
 
 type Company = {
   id: string;
@@ -16,18 +16,28 @@ type Company = {
   status: string;
 };
 
+const PAGE_SIZE = 50;
+
 export default function CompaniesPage() {
   const [companies, setCompanies] = useState<Company[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState<string | null>(null);
   const [scanResult, setScanResult] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    fetch("/api/companies")
+    setLoading(true);
+    fetch(`/api/companies?limit=${PAGE_SIZE}&offset=${page * PAGE_SIZE}`)
       .then((res) => res.json())
-      .then((data) => setCompanies(data.companies ?? []))
+      .then((data) => {
+        setCompanies(data.companies ?? []);
+        setTotal(data.total ?? 0);
+      })
       .finally(() => setLoading(false));
-  }, []);
+  }, [page]);
+
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   async function handleFindRoles(companyId: string) {
     setScanning(companyId);
@@ -82,7 +92,7 @@ export default function CompaniesPage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
-            <Building2 className="w-4 h-4 text-emerald-600" /> Companies ({companies.length})
+            <Building2 className="w-4 h-4 text-emerald-600" /> Companies ({total.toLocaleString()})
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -151,6 +161,32 @@ export default function CompaniesPage() {
                   ))}
                 </tbody>
               </table>
+
+              <div className="flex items-center justify-between pt-4 text-xs text-shade-50">
+                <span>
+                  Page {page + 1} of {totalPages.toLocaleString()}
+                </span>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline-light"
+                    size="sm"
+                    className="gap-1"
+                    disabled={page === 0}
+                    onClick={() => setPage((p) => Math.max(0, p - 1))}
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" /> Prev
+                  </Button>
+                  <Button
+                    variant="outline-light"
+                    size="sm"
+                    className="gap-1"
+                    disabled={page + 1 >= totalPages}
+                    onClick={() => setPage((p) => p + 1)}
+                  >
+                    Next <ChevronRight className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+              </div>
             </div>
           )}
         </CardContent>

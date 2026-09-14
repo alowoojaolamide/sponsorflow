@@ -30,7 +30,7 @@ export default function PendingEmailsPage() {
     const [draftsRes, readyRes, companiesRes] = await Promise.all([
       fetch("/api/emails?status=draft").then((r) => r.json()),
       fetch("/api/emails?status=ready_to_send").then((r) => r.json()),
-      fetch("/api/companies").then((r) => r.json()),
+      fetch("/api/companies?limit=2000").then((r) => r.json()),
     ]);
     setDrafts(draftsRes.emails ?? []);
     setReadyToSend(readyRes.emails ?? []);
