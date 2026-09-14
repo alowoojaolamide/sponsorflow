@@ -3,7 +3,7 @@
 import React, { Suspense, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { EmailGenerator } from "@/components/emails/EmailGenerator";
+import { EmailGenerator, type GenerateParams } from "@/components/emails/EmailGenerator";
 import { EmailApprovalUI, type EmailDraftView } from "@/components/emails/EmailApprovalUI";
 import { Button } from "@/components/ui/button";
 
@@ -16,18 +16,21 @@ function EmailsPageInner() {
   const [isBusy, setIsBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastCompanyId, setLastCompanyId] = useState<string | undefined>(initialCompanyId);
+  const [lastJobParams, setLastJobParams] = useState<{ job_title?: string; job_url?: string; job_description?: string }>({});
 
-  async function generate(companyId: string) {
-    if (!companyId) return;
+  async function generate(params: GenerateParams) {
+    if (!params.companyId) return;
     setError(null);
     setIsGenerating(true);
-    setLastCompanyId(companyId);
+    setLastCompanyId(params.companyId);
+    const jobParams = { job_title: params.jobTitle, job_url: params.jobUrl, job_description: params.jobDescription };
+    setLastJobParams(jobParams);
 
     try {
       const draftRes = await fetch("/api/emails/draft", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ company_id: companyId }),
+        body: JSON.stringify({ company_id: params.companyId, ...jobParams }),
       });
       const draftData = await draftRes.json();
       if (!draftRes.ok) throw new Error(draftData.error || "Failed to generate draft");
@@ -44,6 +47,8 @@ function EmailsPageInner() {
           body: draftData.body,
           positioning_angle: draftData.positioning_angle,
           confidence: draftData.confidence,
+          job_title: draftData.job_title,
+          job_url: draftData.job_url,
         }),
       });
       const saveData = await saveRes.json();
@@ -74,7 +79,7 @@ function EmailsPageInner() {
       const draftRes = await fetch("/api/emails/draft", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ company_id: lastCompanyId }),
+        body: JSON.stringify({ company_id: lastCompanyId, ...lastJobParams }),
       });
       const draftData = await draftRes.json();
       if (!draftRes.ok) throw new Error(draftData.error || "Failed to regenerate");

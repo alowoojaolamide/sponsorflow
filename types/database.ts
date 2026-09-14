@@ -517,6 +517,8 @@ export type Database = {
           user_edits: string | null;
           gmail_message_id: string | null;
           gmail_thread_id: string | null;
+          job_title: string | null;
+          job_url: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -542,6 +544,8 @@ export type Database = {
           user_edits?: string | null;
           gmail_message_id?: string | null;
           gmail_thread_id?: string | null;
+          job_title?: string | null;
+          job_url?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -567,6 +571,8 @@ export type Database = {
           user_edits?: string | null;
           gmail_message_id?: string | null;
           gmail_thread_id?: string | null;
+          job_title?: string | null;
+          job_url?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -907,6 +913,14 @@ export type Database = {
       email_hash: {
         Args: { raw_email: string };
         Returns: string;
+      };
+      record_email_open: {
+        Args: { p_email_id: string };
+        Returns: undefined;
+      };
+      record_email_click: {
+        Args: { p_email_id: string; p_link?: string | null };
+        Returns: undefined;
       };
     };
   };

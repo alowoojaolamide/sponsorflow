@@ -2,22 +2,34 @@
 
 import React, { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Sparkles, RefreshCw } from "lucide-react";
 
 type Company = { id: string; company_name: string; industry: string | null };
+
+export type GenerateParams = {
+  companyId: string;
+  jobTitle?: string;
+  jobUrl?: string;
+  jobDescription?: string;
+};
 
 export function EmailGenerator({
   onGenerate,
   isGenerating,
   initialCompanyId,
 }: {
-  onGenerate: (companyId: string) => void;
+  onGenerate: (params: GenerateParams) => void;
   isGenerating: boolean;
   initialCompanyId?: string;
 }) {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [selected, setSelected] = useState(initialCompanyId ?? "");
+  const [showJobFields, setShowJobFields] = useState(false);
+  const [jobTitle, setJobTitle] = useState("");
+  const [jobUrl, setJobUrl] = useState("");
+  const [jobDescription, setJobDescription] = useState("");
 
   useEffect(() => {
     fetch("/api/companies")
@@ -54,13 +66,54 @@ export function EmailGenerator({
             ))}
           </select>
         </div>
+
+        <button
+          type="button"
+          className="text-xs text-primary underline underline-offset-4"
+          onClick={() => setShowJobFields((s) => !s)}
+        >
+          {showJobFields ? "Hide" : "Pitching for a specific open role?"}
+        </button>
+
+        {showJobFields && (
+          <div className="space-y-3 p-3 bg-canvas-cream rounded-md border border-hairline-light">
+            <Input
+              label="Job title"
+              placeholder="Senior Product Designer"
+              value={jobTitle}
+              onChange={(e) => setJobTitle(e.target.value)}
+            />
+            <Input
+              label="Job posting URL (optional)"
+              placeholder="https://company.com/careers/123"
+              value={jobUrl}
+              onChange={(e) => setJobUrl(e.target.value)}
+            />
+            <div>
+              <label className="block text-sm font-medium text-ink mb-1.5">Job description (optional — paste it for a sharper pitch)</label>
+              <textarea
+                rows={3}
+                value={jobDescription}
+                onChange={(e) => setJobDescription(e.target.value)}
+                className="flex w-full rounded-md border border-hairline-light bg-canvas-light px-3.5 py-2.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+            </div>
+          </div>
+        )}
       </CardContent>
       <CardFooter className="flex justify-between border-t border-hairline-light pt-4">
         <span className="text-xs text-shade-40">Powered by Anthropic Claude API</span>
         <Button
           variant="primary"
           disabled={isGenerating || !selected}
-          onClick={() => onGenerate(selected)}
+          onClick={() =>
+            onGenerate({
+              companyId: selected,
+              jobTitle: jobTitle || undefined,
+              jobUrl: jobUrl || undefined,
+              jobDescription: jobDescription || undefined,
+            })
+          }
         >
           {isGenerating ? (
             <span className="flex items-center gap-2">

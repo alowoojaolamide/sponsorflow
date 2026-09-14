@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { Database } from "@/types/database";
 import { getValidAccessToken, sendGmailMessage } from "@/lib/gmail";
 import { checkAndConsumeSendLimit } from "@/lib/rate-limit";
+import { buildTrackedHtmlBody } from "@/lib/email-tracking";
 
 type DB = SupabaseClient<Database>;
 
@@ -36,12 +37,24 @@ export async function sendOutreachEmail(supabase: DB, userId: string, emailId: s
   }
 
   try {
+    const { data: profile } = await supabase
+      .from("user_profiles")
+      .select("portfolio_url, linkedin_url")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    const htmlBody = buildTrackedHtmlBody(email.body, emailId, {
+      portfolioUrl: profile?.portfolio_url,
+      linkedinUrl: profile?.linkedin_url,
+    });
+
     const sent = await sendGmailMessage(
       gmail.accessToken,
       gmail.connection.gmail_email,
       email.to_email,
       email.subject,
-      email.body
+      email.body,
+      htmlBody
     );
 
     await supabase

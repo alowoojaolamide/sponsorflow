@@ -18,7 +18,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const { company_id, contact_id } = await req.json();
+    const { company_id, contact_id, job_title, job_url, job_description } = await req.json();
     if (!company_id) {
       return NextResponse.json({ error: "company_id is required" }, { status: 400 });
     }
@@ -55,7 +55,8 @@ export async function POST(req: Request) {
       );
     }
 
-    const draft = await generateEmailDraft(full.profile, full.industries, full.projects, company);
+    const job = job_title ? { title: job_title, url: job_url ?? null, description: job_description ?? null } : null;
+    const draft = await generateEmailDraft(full.profile, full.industries, full.projects, company, job);
 
     const toEmail =
       contact?.email ??
@@ -69,6 +70,8 @@ export async function POST(req: Request) {
       contact_id: contact?.id ?? null,
       to_email: toEmail,
       to_name: contact?.name ?? null,
+      job_title: job?.title ?? null,
+      job_url: job?.url ?? null,
       ...draft,
     });
   } catch (err: unknown) {

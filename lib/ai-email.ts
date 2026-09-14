@@ -22,11 +22,18 @@ function pickPositioning(
   return industries[0] ?? null;
 }
 
+export type JobPitch = {
+  title: string;
+  url?: string | null;
+  description?: string | null;
+};
+
 function buildPrompt(
   profile: Tables<"user_profiles">,
   positioning: Tables<"user_industries"> | null,
   project: Tables<"user_projects"> | null,
-  company: Tables<"companies">
+  company: Tables<"companies">,
+  job: JobPitch | null
 ) {
   return `You are writing a personalized cold email from a job candidate to a company, for UK Skilled Worker visa sponsorship outreach.
 
@@ -46,15 +53,20 @@ COMPANY DATA:
 - Website: ${company.website ?? "Unknown"}
 - Personalization hook: ${company.personalization_hook ?? "None provided — research the company's public product/mission and reference it generically"}
 
+${job ? `SPECIFIC OPEN ROLE BEING PITCHED FOR:
+- Title: ${job.title}
+${job.description ? `- Description: ${job.description}` : ""}
+This is a real, currently-open role at this company. Reference it explicitly and connect the candidate's actual experience directly to what this specific role needs — this should read as "I saw you're hiring for X and here's why I'd be a strong fit", not a generic cold intro.` : "No specific open role was given — write a general expression of interest in working there, without claiming a specific role exists."}
+
 RULES:
 1. Use ONLY the candidate's actual experience given above — never invent claims, metrics, or projects.
 2. Reference the company's specific product/challenge using the personalization hook.
-3. Connect the candidate's real experience to the company's likely need.
+3. Connect the candidate's real experience to the company's likely need${job ? " and to the specific role above" : ""}.
 4. Keep the body length between 70 and 150 words.
 5. Tone: warm, direct, not corporate. No clichés like "passionate", "dynamic", "innovative".
 6. End the body with a line: [Portfolio] [LinkedIn] [CV]
 7. Sign off with the candidate's first name only (use "Candidate" if no name is available).
-8. Do not use a generic subject line — make it specific to the company and role.
+8. ${job ? `Reference the role title "${job.title}" in the subject line.` : "Do not use a generic subject line — make it specific to the company."}
 
 Respond with ONLY valid JSON, no markdown fences, in this exact shape:
 {"subject": "...", "body": "...", "positioning_angle": "...", "confidence": 0-100}`;
@@ -64,11 +76,12 @@ export async function generateEmailDraft(
   profile: Tables<"user_profiles">,
   industries: Tables<"user_industries">[],
   projects: Tables<"user_projects">[],
-  company: Tables<"companies">
+  company: Tables<"companies">,
+  job: JobPitch | null = null
 ): Promise<EmailDraft> {
   const positioning = pickPositioning(company.industry, industries);
   const project = projects[0] ?? null;
-  const prompt = buildPrompt(profile, positioning, project, company);
+  const prompt = buildPrompt(profile, positioning, project, company, job);
 
   const raw = await callClaude(prompt, 600);
 

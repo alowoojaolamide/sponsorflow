@@ -40,6 +40,8 @@ export async function POST(req: Request) {
       body: emailBody,
       positioning_angle,
       confidence,
+      job_title,
+      job_url,
     } = body;
 
     if (!company_id || !to_email || !subject || !emailBody) {
@@ -64,6 +66,8 @@ export async function POST(req: Request) {
         ai_model: "claude-sonnet-4-5",
         ai_positioning_angle: positioning_angle ?? null,
         ai_confidence: confidence ?? null,
+        job_title: job_title ?? null,
+        job_url: job_url ?? null,
       })
       .select("*")
       .single();

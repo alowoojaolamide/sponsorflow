@@ -153,16 +153,38 @@ export async function sendGmailMessage(
   fromEmail: string,
   toEmail: string,
   subject: string,
-  body: string
+  body: string,
+  htmlBody?: string
 ): Promise<{ id: string; threadId: string }> {
-  const rawMessage = [
-    `From: ${fromEmail}`,
-    `To: ${toEmail}`,
-    `Subject: ${subject}`,
-    "Content-Type: text/plain; charset=utf-8",
-    "",
-    body,
-  ].join("\r\n");
+  const boundary = `sponsorflow_${Math.random().toString(36).slice(2)}`;
+
+  const rawMessage = htmlBody
+    ? [
+        `From: ${fromEmail}`,
+        `To: ${toEmail}`,
+        `Subject: ${subject}`,
+        `Content-Type: multipart/alternative; boundary="${boundary}"`,
+        "",
+        `--${boundary}`,
+        "Content-Type: text/plain; charset=utf-8",
+        "",
+        body,
+        "",
+        `--${boundary}`,
+        "Content-Type: text/html; charset=utf-8",
+        "",
+        htmlBody,
+        "",
+        `--${boundary}--`,
+      ].join("\r\n")
+    : [
+        `From: ${fromEmail}`,
+        `To: ${toEmail}`,
+        `Subject: ${subject}`,
+        "Content-Type: text/plain; charset=utf-8",
+        "",
+        body,
+      ].join("\r\n");
 
   const res = await fetch("https://www.googleapis.com/gmail/v1/users/me/messages/send", {
     method: "POST",
