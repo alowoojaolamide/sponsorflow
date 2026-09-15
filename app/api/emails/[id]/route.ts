@@ -34,14 +34,19 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
 
   try {
     const body = await req.json();
-    const { status, subject, body: emailBody } = body as {
+    const { status, subject, body: emailBody, to_email, to_name } = body as {
       status?: string;
       subject?: string;
       body?: string;
+      to_email?: string;
+      to_name?: string;
     };
 
     if (status && !VALID_STATUSES.includes(status)) {
       return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+    }
+    if (to_email !== undefined && !to_email.trim()) {
+      return NextResponse.json({ error: "Recipient email cannot be empty" }, { status: 400 });
     }
 
     const updates: TablesUpdate<"outreach_emails"> = {};
@@ -57,6 +62,8 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
       updates.body = emailBody;
       updates.user_edits = emailBody;
     }
+    if (to_email !== undefined) updates.to_email = to_email.trim();
+    if (to_name !== undefined) updates.to_name = to_name.trim() || null;
 
     const supabase = createSupabaseRouteClient();
     const { data, error } = await supabase

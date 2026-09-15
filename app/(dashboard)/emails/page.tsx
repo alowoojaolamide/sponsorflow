@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { EmailGenerator, type GenerateParams } from "@/components/emails/EmailGenerator";
 import { EmailApprovalUI, type EmailDraftView } from "@/components/emails/EmailApprovalUI";
 import { LinkedInMessageCard, type LinkedInDraftView } from "@/components/emails/LinkedInMessageCard";
+import { PendingRecipientCard, type PendingDraft } from "@/components/emails/PendingRecipientCard";
 import { Button } from "@/components/ui/button";
 
 function EmailsPageInner() {
@@ -15,6 +16,7 @@ function EmailsPageInner() {
   const initialJobUrl = searchParams.get("job_url") ?? undefined;
 
   const [draft, setDraft] = useState<EmailDraftView | null>(null);
+  const [pendingDraft, setPendingDraft] = useState<PendingDraft | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -54,6 +56,7 @@ function EmailsPageInner() {
     if (!params.companyId) return;
     setError(null);
     setIsGenerating(true);
+    setPendingDraft(null);
     setLastCompanyId(params.companyId);
     const jobParams = { job_title: params.jobTitle, job_url: params.jobUrl, job_description: params.jobDescription };
     setLastJobParams(jobParams);
@@ -67,25 +70,25 @@ function EmailsPageInner() {
       const draftData = await draftRes.json();
       if (!draftRes.ok) throw new Error(draftData.error || "Failed to generate draft");
 
-      const saveRes = await fetch("/api/emails", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      if (!draftData.to_email) {
+        // No website or contact on file to derive a recipient from — hold the
+        // generated content and ask for one instead of failing the save.
+        setDraft(null);
+        setPendingDraft({
           company_id: draftData.company_id,
+          company_name: draftData.company_name,
           contact_id: draftData.contact_id,
-          to_email: draftData.to_email,
-          to_name: draftData.to_name,
           subject: draftData.subject,
           body: draftData.body,
           positioning_angle: draftData.positioning_angle,
           confidence: draftData.confidence,
           job_title: draftData.job_title,
           job_url: draftData.job_url,
-        }),
-      });
-      const saveData = await saveRes.json();
-      if (!saveRes.ok) throw new Error(saveData.error || "Failed to save draft");
+        });
+        return;
+      }
 
+      const saveData = await savePersonalizedDraft(draftData, draftData.to_email, draftData.to_name);
       setDraft({
         id: saveData.email.id,
         company_name: draftData.company_name,
@@ -100,6 +103,56 @@ function EmailsPageInner() {
       setError(err instanceof Error ? err.message : "Failed to generate draft");
     } finally {
       setIsGenerating(false);
+    }
+  }
+
+  async function savePersonalizedDraft(
+    draftData: { company_id: string; contact_id: string | null; subject: string; body: string; positioning_angle: string; confidence: number; job_title: string | null; job_url: string | null },
+    toEmail: string,
+    toName: string | null
+  ) {
+    const saveRes = await fetch("/api/emails", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        company_id: draftData.company_id,
+        contact_id: draftData.contact_id,
+        to_email: toEmail,
+        to_name: toName,
+        subject: draftData.subject,
+        body: draftData.body,
+        positioning_angle: draftData.positioning_angle,
+        confidence: draftData.confidence,
+        job_title: draftData.job_title,
+        job_url: draftData.job_url,
+      }),
+    });
+    const saveData = await saveRes.json();
+    if (!saveRes.ok) throw new Error(saveData.error || "Failed to save draft");
+    return saveData;
+  }
+
+  async function handleSavePending(toEmail: string) {
+    if (!pendingDraft) return;
+    setIsBusy(true);
+    setError(null);
+    try {
+      const saveData = await savePersonalizedDraft(pendingDraft, toEmail, null);
+      setDraft({
+        id: saveData.email.id,
+        company_name: pendingDraft.company_name,
+        to_name: null,
+        to_email: toEmail,
+        ai_positioning_angle: pendingDraft.positioning_angle,
+        subject: saveData.email.subject,
+        body: saveData.email.body,
+        status: saveData.email.status,
+      });
+      setPendingDraft(null);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to save draft");
+    } finally {
+      setIsBusy(false);
     }
   }
 
@@ -168,7 +221,7 @@ function EmailsPageInner() {
     }
   }
 
-  async function handleSaveEdit(subject: string, body: string) {
+  async function handleSaveEdit(subject: string, body: string, toEmail: string) {
     if (!draft) return;
     setIsBusy(true);
     setError(null);
@@ -176,11 +229,13 @@ function EmailsPageInner() {
       const res = await fetch(`/api/emails/${draft.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ subject, body }),
+        body: JSON.stringify({ subject, body, to_email: toEmail }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to save");
-      setDraft((d) => (d ? { ...d, subject: data.email.subject, body: data.email.body } : d));
+      setDraft((d) =>
+        d ? { ...d, subject: data.email.subject, body: data.email.body, to_email: data.email.to_email } : d
+      );
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to save");
     } finally {
@@ -223,14 +278,18 @@ function EmailsPageInner() {
           initialJobTitle={initialJobTitle}
           initialJobUrl={initialJobUrl}
         />
-        <EmailApprovalUI
-          draft={draft}
-          onApprove={handleApprove}
-          onReject={handleReject}
-          onRegenerate={handleRegenerate}
-          onSaveEdit={handleSaveEdit}
-          isBusy={isBusy}
-        />
+        {pendingDraft ? (
+          <PendingRecipientCard pending={pendingDraft} isBusy={isBusy} onSave={handleSavePending} />
+        ) : (
+          <EmailApprovalUI
+            draft={draft}
+            onApprove={handleApprove}
+            onReject={handleReject}
+            onRegenerate={handleRegenerate}
+            onSaveEdit={handleSaveEdit}
+            isBusy={isBusy}
+          />
+        )}
       </div>
 
       {linkedinDraft && (

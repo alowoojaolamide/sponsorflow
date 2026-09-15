@@ -32,18 +32,20 @@ export function EmailApprovalUI({
   onApprove?: () => void;
   onReject?: () => void;
   onRegenerate?: () => void;
-  onSaveEdit?: (subject: string, body: string) => void;
+  onSaveEdit?: (subject: string, body: string, toEmail: string) => void;
   isBusy?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [subject, setSubject] = useState(draft?.subject ?? "");
   const [body, setBody] = useState(draft?.body ?? "");
+  const [toEmail, setToEmail] = useState(draft?.to_email ?? "");
 
   useEffect(() => {
     setSubject(draft?.subject ?? "");
     setBody(draft?.body ?? "");
+    setToEmail(draft?.to_email ?? "");
     setEditing(false);
-  }, [draft?.id, draft?.subject, draft?.body]);
+  }, [draft?.id, draft?.subject, draft?.body, draft?.to_email]);
 
   if (!draft) {
     return (
@@ -70,9 +72,22 @@ export function EmailApprovalUI({
             <CardTitle className="text-lg font-bold mt-2">
               Review Draft: {draft.company_name}
             </CardTitle>
-            <p className="text-xs text-shade-50 mt-0.5">
-              Recipient: {draft.to_name ?? draft.to_email}
-            </p>
+            {editing ? (
+              <div className="mt-1.5">
+                <input
+                  type="email"
+                  placeholder="recipient@company.com"
+                  className="text-xs font-mono px-2 py-1 rounded border border-hairline-light bg-canvas-cream text-ink w-64 focus:border-primary focus:outline-none"
+                  value={toEmail}
+                  onChange={(e) => setToEmail(e.target.value)}
+                />
+              </div>
+            ) : (
+              <p className="text-xs text-shade-50 mt-0.5">
+                Recipient: {draft.to_email || <span className="text-amber-600 font-medium">Not set — click Edit to add one</span>}
+                {draft.to_name ? ` (${draft.to_name})` : ""}
+              </p>
+            )}
           </div>
           <div className="text-right">
             <span className="text-xs text-shade-50">Word Count: {count} words</span>
@@ -120,8 +135,9 @@ export function EmailApprovalUI({
               variant="ghost"
               size="sm"
               className="gap-1.5 text-xs"
+              disabled={!toEmail.trim()}
               onClick={() => {
-                onSaveEdit?.(subject, body);
+                onSaveEdit?.(subject, body, toEmail.trim());
                 setEditing(false);
               }}
             >
@@ -146,7 +162,14 @@ export function EmailApprovalUI({
           </Button>
         </div>
 
-        <Button variant="primary" size="md" className="gap-2" disabled={isBusy} onClick={onApprove}>
+        <Button
+          variant="primary"
+          size="md"
+          className="gap-2"
+          disabled={isBusy || !draft.to_email}
+          title={!draft.to_email ? "Add a recipient email first (click Edit)" : undefined}
+          onClick={onApprove}
+        >
           <Check className="w-4 h-4" /> Approve & Queue to Send
         </Button>
       </CardFooter>

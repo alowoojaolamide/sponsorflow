@@ -29,6 +29,7 @@ export default function JobsPage() {
   const [batchTotal, setBatchTotal] = useState(0);
   const [batchDrafted, setBatchDrafted] = useState(0);
   const [batchErrors, setBatchErrors] = useState(0);
+  const [batchSkippedNoEmail, setBatchSkippedNoEmail] = useState(0);
   const [batchLastError, setBatchLastError] = useState<string | null>(null);
   const batchCancelRef = React.useRef(false);
 
@@ -73,6 +74,9 @@ export default function JobsPage() {
     });
     const draftData = await draftRes.json();
     if (!draftRes.ok) throw new Error(draftData.error || "Failed to generate draft");
+    if (!draftData.to_email) {
+      throw new Error("NO_RECIPIENT_EMAIL");
+    }
 
     const saveRes = await fetch("/api/emails", {
       method: "POST",
@@ -107,6 +111,7 @@ export default function JobsPage() {
     setBatchDone(0);
     setBatchDrafted(0);
     setBatchErrors(0);
+    setBatchSkippedNoEmail(0);
     setBatchLastError(null);
     setBatchTotal(targets.length);
 
@@ -117,7 +122,9 @@ export default function JobsPage() {
         (job) => draftOne(job),
         (job, _index, _result, error) => {
           setBatchDone((d) => d + 1);
-          if (error) {
+          if (error instanceof Error && error.message === "NO_RECIPIENT_EMAIL") {
+            setBatchSkippedNoEmail((n) => n + 1);
+          } else if (error) {
             setBatchErrors((e) => e + 1);
             setBatchLastError(error instanceof Error ? error.message : "Failed to draft");
           } else {
@@ -191,6 +198,8 @@ export default function JobsPage() {
             </div>
             <p className="text-xs text-shade-50">
               {batchDrafted} draft{batchDrafted === 1 ? "" : "s"} created
+              {batchSkippedNoEmail > 0 &&
+                ` · ${batchSkippedNoEmail} skipped (no recipient email on file — add one via "Pitch This Role")`}
               {batchErrors > 0 && ` · ${batchErrors} failed${batchLastError ? ` (${batchLastError})` : ""}`}
               {!batchRunning && batchDrafted > 0 && (
                 <>
