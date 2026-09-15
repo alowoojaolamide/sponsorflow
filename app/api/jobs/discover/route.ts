@@ -43,6 +43,11 @@ export async function POST(req: Request) {
       extraKeywords
     );
 
+    // Mark scanned regardless of outcome so a batch re-run can skip this
+    // company and resume from where it left off instead of re-scanning
+    // everyone from the start every time.
+    await supabase.from("companies").update({ jobs_scanned_at: new Date().toISOString() }).eq("id", company.id);
+
     if (jobs.length === 0) {
       return NextResponse.json({ found: 0, jobs: [], no_career_page: !company.career_page });
     }

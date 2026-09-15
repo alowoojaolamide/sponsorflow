@@ -18,6 +18,8 @@ export async function GET(req: Request) {
   const sortParam = searchParams.get("sort") || undefined;
   const sort = sortParam && isSortableColumn(sortParam) ? sortParam : undefined;
   const order = searchParams.get("order") === "asc" ? "asc" : "desc";
+  const scannedParam = searchParams.get("scanned");
+  const scanned = scannedParam === "false" ? false : scannedParam === "true" ? true : undefined;
 
   const supabase = createSupabaseRouteClient();
   const { companies, total } = await getCompanies(supabase, user.id, {
@@ -28,6 +30,7 @@ export async function GET(req: Request) {
     industry,
     sort,
     order,
+    scanned,
   });
 
   return NextResponse.json({ companies, total, limit, offset });

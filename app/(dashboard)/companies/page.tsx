@@ -17,6 +17,7 @@ import {
   ArrowUpDown,
   Radar,
   X,
+  CheckCircle2,
 } from "lucide-react";
 
 type Company = {
@@ -27,7 +28,12 @@ type Company = {
   industry: string | null;
   personalization_hook: string | null;
   status: string;
+  jobs_scanned_at: string | null;
 };
+
+// Companies API caps `limit` at 2000 per request server-side, so scanning
+// the full list (100k+ for large imports) means paging through it.
+const FETCH_PAGE_SIZE = 2000;
 
 type SortColumn = "company_name" | "industry" | "status";
 
@@ -43,10 +49,13 @@ export default function CompaniesPage() {
   const [scanResult, setScanResult] = useState<Record<string, string>>({});
 
   const [batchRunning, setBatchRunning] = useState(false);
+  const [batchFetchingTargets, setBatchFetchingTargets] = useState(false);
   const [batchDone, setBatchDone] = useState(0);
   const [batchTotal, setBatchTotal] = useState(0);
   const [batchJobsFound, setBatchJobsFound] = useState(0);
   const [batchErrors, setBatchErrors] = useState(0);
+  const [rescanAll, setRescanAll] = useState(false);
+  const [unscannedCount, setUnscannedCount] = useState<number | null>(null);
   const batchCancelRef = React.useRef(false);
 
   const [searchInput, setSearchInput] = useState("");
@@ -83,6 +92,18 @@ export default function CompaniesPage() {
       })
       .finally(() => setLoading(false));
   }, [page, search, statusFilter, sortColumn, sortOrder]);
+
+  // Drives the "Discover Jobs for All" button's remaining-count hint —
+  // refetched whenever the filters or the batch scan's progress change.
+  useEffect(() => {
+    const params = new URLSearchParams({ limit: "1", scanned: "false" });
+    if (search) params.set("search", search);
+    if (statusFilter) params.set("status", statusFilter);
+    fetch(`/api/companies?${params.toString()}`)
+      .then((res) => res.json())
+      .then((data) => setUnscannedCount(data.total ?? 0))
+      .catch(() => setUnscannedCount(null));
+  }, [search, statusFilter, batchRunning]);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
@@ -121,6 +142,8 @@ export default function CompaniesPage() {
             ? "No career page on file"
             : "No matching roles found",
       }));
+      const scannedAt = new Date().toISOString();
+      setCompanies((cs) => cs.map((c) => (c.id === companyId ? { ...c, jobs_scanned_at: scannedAt } : c)));
     } catch (err: unknown) {
       setScanResult((r) => ({ ...r, [companyId]: err instanceof Error ? err.message : "Scan failed" }));
     } finally {
@@ -128,20 +151,38 @@ export default function CompaniesPage() {
     }
   }
 
+  // Fetches every company matching the current filters (paginating past the
+  // API's 2000-per-request cap) so the batch scan covers a full 100k+ list.
+  async function fetchAllTargets(onlyUnscanned: boolean): Promise<Company[]> {
+    const all: Company[] = [];
+    let offset = 0;
+    for (;;) {
+      const params = new URLSearchParams({ limit: String(FETCH_PAGE_SIZE), offset: String(offset) });
+      if (search) params.set("search", search);
+      if (statusFilter) params.set("status", statusFilter);
+      if (onlyUnscanned) params.set("scanned", "false");
+      const res = await fetch(`/api/companies?${params.toString()}`);
+      const data = await res.json();
+      const batch: Company[] = data.companies ?? [];
+      all.push(...batch);
+      if (batchCancelRef.current || batch.length < FETCH_PAGE_SIZE) break;
+      offset += FETCH_PAGE_SIZE;
+    }
+    return all;
+  }
+
   async function handleBatchDiscover() {
     setBatchRunning(true);
+    setBatchFetchingTargets(true);
     batchCancelRef.current = false;
     setBatchDone(0);
     setBatchJobsFound(0);
     setBatchErrors(0);
+    setBatchTotal(0);
 
     try {
-      const params = new URLSearchParams({ limit: "2000" });
-      if (search) params.set("search", search);
-      if (statusFilter) params.set("status", statusFilter);
-      const res = await fetch(`/api/companies?${params.toString()}`);
-      const data = await res.json();
-      const targets: Company[] = data.companies ?? [];
+      const targets = await fetchAllTargets(!rescanAll);
+      setBatchFetchingTargets(false);
       setBatchTotal(targets.length);
 
       await runWithConcurrency(
@@ -153,17 +194,20 @@ export default function CompaniesPage() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ company_id: company.id }),
           }).then((r) => r.json()),
-        (_company, _index, result, error) => {
+        (company, _index, result, error) => {
           setBatchDone((d) => d + 1);
           if (error || result?.error) {
             setBatchErrors((e) => e + 1);
           } else {
             setBatchJobsFound((n) => n + (result?.found ?? 0));
+            const scannedAt = new Date().toISOString();
+            setCompanies((cs) => cs.map((c) => (c.id === company.id ? { ...c, jobs_scanned_at: scannedAt } : c)));
           }
         },
         () => batchCancelRef.current
       );
     } finally {
+      setBatchFetchingTargets(false);
       setBatchRunning(false);
     }
   }
@@ -177,27 +221,47 @@ export default function CompaniesPage() {
             Import your company list via CSV with automatic deduplication, or add companies one at a time.
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button
-            variant="outline-light"
-            size="sm"
-            className="gap-2"
-            disabled={batchRunning || total === 0}
-            onClick={handleBatchDiscover}
-          >
-            <Radar className={`w-4 h-4 ${batchRunning ? "animate-pulse" : ""}`} />
-            {batchRunning ? "Scanning..." : "Discover Jobs for All"}
-          </Button>
-          <Link href="/jobs">
-            <Button variant="outline-light" size="sm" className="gap-2">
-              <Search className="w-4 h-4" /> Open Roles
+        <div className="flex flex-col items-end gap-1.5">
+          <div className="flex gap-2">
+            <Button
+              variant="outline-light"
+              size="sm"
+              className="gap-2"
+              disabled={batchRunning || total === 0 || (unscannedCount === 0 && !rescanAll)}
+              onClick={handleBatchDiscover}
+            >
+              <Radar className={`w-4 h-4 ${batchRunning ? "animate-pulse" : ""}`} />
+              {batchRunning
+                ? batchFetchingTargets
+                  ? "Finding companies to scan..."
+                  : "Scanning..."
+                : rescanAll
+                ? "Re-scan All Jobs"
+                : unscannedCount != null
+                ? `Discover Jobs for All (${unscannedCount.toLocaleString()} left)`
+                : "Discover Jobs for All"}
             </Button>
-          </Link>
-          <Link href="/companies/import">
-            <Button variant="outline-light" size="sm" className="gap-2">
-              <Upload className="w-4 h-4" /> Import CSV
-            </Button>
-          </Link>
+            <Link href="/jobs">
+              <Button variant="outline-light" size="sm" className="gap-2">
+                <Search className="w-4 h-4" /> Open Roles
+              </Button>
+            </Link>
+            <Link href="/companies/import">
+              <Button variant="outline-light" size="sm" className="gap-2">
+                <Upload className="w-4 h-4" /> Import CSV
+              </Button>
+            </Link>
+          </div>
+          <label className="flex items-center gap-1.5 text-xs text-shade-50 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={rescanAll}
+              disabled={batchRunning}
+              onChange={(e) => setRescanAll(e.target.checked)}
+              className="rounded border-hairline-light"
+            />
+            Re-scan already-scanned companies too
+          </label>
         </div>
       </div>
 
@@ -208,7 +272,11 @@ export default function CompaniesPage() {
               <span className="font-medium text-ink flex items-center gap-2">
                 <Radar className={`w-4 h-4 text-primary ${batchRunning ? "animate-pulse" : ""}`} />
                 {batchRunning
-                  ? `Scanning companies for open roles... (${batchDone}/${batchTotal})`
+                  ? batchFetchingTargets
+                    ? "Finding companies to scan..."
+                    : `Scanning companies for open roles... (${batchDone}/${batchTotal})`
+                  : batchDone < batchTotal
+                  ? `Stopped — ${batchDone}/${batchTotal} checked. Click "Discover Jobs for All" again to resume.`
                   : `Scan complete — ${batchDone}/${batchTotal} companies checked`}
               </span>
               {batchRunning ? (
@@ -341,9 +409,18 @@ export default function CompaniesPage() {
                               <ExternalLink className="w-3 h-3" />
                             </a>
                           )}
+                          {c.jobs_scanned_at && !scanResult[c.id] && (
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                          )}
                         </div>
-                        {scanResult[c.id] && (
+                        {scanResult[c.id] ? (
                           <p className="text-[11px] text-shade-40 mt-0.5">{scanResult[c.id]}</p>
+                        ) : (
+                          c.jobs_scanned_at && (
+                            <p className="text-[11px] text-shade-40 mt-0.5">
+                              Scanned {new Date(c.jobs_scanned_at).toLocaleDateString()}
+                            </p>
+                          )
                         )}
                       </td>
                       <td className="py-3.5 text-shade-60">{c.industry ?? "—"}</td>

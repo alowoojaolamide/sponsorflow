@@ -196,6 +196,7 @@ export async function getCompanies(
     industry?: string;
     sort?: SortableColumn;
     order?: "asc" | "desc";
+    scanned?: boolean;
   } = {}
 ): Promise<{ companies: Tables<"companies">[]; total: number }> {
   const limit = options.limit ?? 50;
@@ -213,6 +214,11 @@ export async function getCompanies(
   }
   if (options.industry) {
     query = query.eq("industry", options.industry);
+  }
+  if (options.scanned === false) {
+    query = query.is("jobs_scanned_at", null);
+  } else if (options.scanned === true) {
+    query = query.not("jobs_scanned_at", "is", null);
   }
 
   const { data, error, count } = await query

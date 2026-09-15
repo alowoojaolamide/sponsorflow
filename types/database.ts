@@ -382,6 +382,7 @@ export type Database = {
           career_page: string | null;
           personalization_hook: string | null;
           sponsor_status: string | null;
+          jobs_scanned_at: string | null;
           status: string;
           created_at: string;
           updated_at: string;
@@ -399,6 +400,7 @@ export type Database = {
           career_page?: string | null;
           personalization_hook?: string | null;
           sponsor_status?: string | null;
+          jobs_scanned_at?: string | null;
           status?: string;
           created_at?: string;
           updated_at?: string;
@@ -416,6 +418,7 @@ export type Database = {
           career_page?: string | null;
           personalization_hook?: string | null;
           sponsor_status?: string | null;
+          jobs_scanned_at?: string | null;
           status?: string;
           created_at?: string;
           updated_at?: string;
