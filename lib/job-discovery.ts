@@ -168,5 +168,21 @@ export async function discoverJobsForCompany(
     return aiJobs.filter((j) => isRelevantTitle(j.title, extraKeywords));
   }
 
+  // No explicit career page on file, but a website is (e.g. backfilled by
+  // company research) — worth one free HTML scan for an embedded
+  // Greenhouse/Lever link before giving up. Deliberately skips the paid AI
+  // extraction step here: running that across every company with only a
+  // homepage URL (as opposed to a confirmed careers page) would be a lot of
+  // OpenAI spend for very low yield, since most such companies won't have
+  // any open roles to find.
+  if (website) {
+    const homepage = website.startsWith("http") ? website : `https://${website}`;
+    const found = await findAtsSlugFromCareerPage(homepage);
+    if (found) {
+      const jobs = found.source === "greenhouse" ? await tryGreenhouse(found.slug) : await tryLever(found.slug);
+      if (jobs) return jobs.filter((j) => isRelevantTitle(j.title, extraKeywords));
+    }
+  }
+
   return [];
 }

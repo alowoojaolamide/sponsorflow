@@ -75,6 +75,7 @@ export default function CompaniesPage() {
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [websiteFilter, setWebsiteFilter] = useState<"" | "yes" | "no">("");
   const [sortColumn, setSortColumn] = useState<SortColumn>("company_name");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
 
@@ -97,6 +98,7 @@ export default function CompaniesPage() {
     });
     if (search) params.set("search", search);
     if (statusFilter) params.set("status", statusFilter);
+    if (websiteFilter) params.set("has_website", websiteFilter === "yes" ? "true" : "false");
 
     fetch(`/api/companies?${params.toString()}`)
       .then((res) => res.json())
@@ -105,7 +107,7 @@ export default function CompaniesPage() {
         setTotal(data.total ?? 0);
       })
       .finally(() => setLoading(false));
-  }, [page, search, statusFilter, sortColumn, sortOrder]);
+  }, [page, search, statusFilter, websiteFilter, sortColumn, sortOrder]);
 
   // Drives the "Discover Jobs for All" button's remaining-count hint —
   // refetched whenever the filters or the batch scan's progress change.
@@ -518,6 +520,18 @@ export default function CompaniesPage() {
                   {s}
                 </option>
               ))}
+            </select>
+            <select
+              value={websiteFilter}
+              onChange={(e) => {
+                setWebsiteFilter(e.target.value as "" | "yes" | "no");
+                setPage(0);
+              }}
+              className="min-h-[40px] rounded-md border border-hairline-light bg-canvas-light px-3 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            >
+              <option value="">Website: any</option>
+              <option value="yes">Has website</option>
+              <option value="no">No website</option>
             </select>
           </div>
         </CardHeader>
