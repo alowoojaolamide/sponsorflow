@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { runWithConcurrency } from "@/lib/utils";
 import {
   Upload,
   Building2,
@@ -14,6 +15,8 @@ import {
   ArrowUp,
   ArrowDown,
   ArrowUpDown,
+  Radar,
+  X,
 } from "lucide-react";
 
 type Company = {
@@ -38,6 +41,13 @@ export default function CompaniesPage() {
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState<string | null>(null);
   const [scanResult, setScanResult] = useState<Record<string, string>>({});
+
+  const [batchRunning, setBatchRunning] = useState(false);
+  const [batchDone, setBatchDone] = useState(0);
+  const [batchTotal, setBatchTotal] = useState(0);
+  const [batchJobsFound, setBatchJobsFound] = useState(0);
+  const [batchErrors, setBatchErrors] = useState(0);
+  const batchCancelRef = React.useRef(false);
 
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
@@ -118,6 +128,46 @@ export default function CompaniesPage() {
     }
   }
 
+  async function handleBatchDiscover() {
+    setBatchRunning(true);
+    batchCancelRef.current = false;
+    setBatchDone(0);
+    setBatchJobsFound(0);
+    setBatchErrors(0);
+
+    try {
+      const params = new URLSearchParams({ limit: "2000" });
+      if (search) params.set("search", search);
+      if (statusFilter) params.set("status", statusFilter);
+      const res = await fetch(`/api/companies?${params.toString()}`);
+      const data = await res.json();
+      const targets: Company[] = data.companies ?? [];
+      setBatchTotal(targets.length);
+
+      await runWithConcurrency(
+        targets,
+        4,
+        (company) =>
+          fetch("/api/jobs/discover", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ company_id: company.id }),
+          }).then((r) => r.json()),
+        (_company, _index, result, error) => {
+          setBatchDone((d) => d + 1);
+          if (error || result?.error) {
+            setBatchErrors((e) => e + 1);
+          } else {
+            setBatchJobsFound((n) => n + (result?.found ?? 0));
+          }
+        },
+        () => batchCancelRef.current
+      );
+    } finally {
+      setBatchRunning(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -128,6 +178,16 @@ export default function CompaniesPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button
+            variant="outline-light"
+            size="sm"
+            className="gap-2"
+            disabled={batchRunning || total === 0}
+            onClick={handleBatchDiscover}
+          >
+            <Radar className={`w-4 h-4 ${batchRunning ? "animate-pulse" : ""}`} />
+            {batchRunning ? "Scanning..." : "Discover Jobs for All"}
+          </Button>
           <Link href="/jobs">
             <Button variant="outline-light" size="sm" className="gap-2">
               <Search className="w-4 h-4" /> Open Roles
@@ -140,6 +200,58 @@ export default function CompaniesPage() {
           </Link>
         </div>
       </div>
+
+      {(batchRunning || batchTotal > 0) && (
+        <Card className="border-primary/30">
+          <CardContent className="py-4 space-y-3">
+            <div className="flex items-center justify-between text-sm">
+              <span className="font-medium text-ink flex items-center gap-2">
+                <Radar className={`w-4 h-4 text-primary ${batchRunning ? "animate-pulse" : ""}`} />
+                {batchRunning
+                  ? `Scanning companies for open roles... (${batchDone}/${batchTotal})`
+                  : `Scan complete — ${batchDone}/${batchTotal} companies checked`}
+              </span>
+              {batchRunning ? (
+                <button
+                  type="button"
+                  className="flex items-center gap-1 text-xs text-red-600 hover:underline"
+                  onClick={() => {
+                    batchCancelRef.current = true;
+                  }}
+                >
+                  <X className="w-3.5 h-3.5" /> Cancel
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="text-xs text-shade-50 hover:text-ink"
+                  onClick={() => setBatchTotal(0)}
+                >
+                  Dismiss
+                </button>
+              )}
+            </div>
+            <div className="w-full h-1.5 rounded-pill bg-hairline-light overflow-hidden">
+              <div
+                className="h-full bg-primary transition-all"
+                style={{ width: `${batchTotal ? (batchDone / batchTotal) * 100 : 0}%` }}
+              />
+            </div>
+            <p className="text-xs text-shade-50">
+              {batchJobsFound} job{batchJobsFound === 1 ? "" : "s"} found so far
+              {batchErrors > 0 && ` · ${batchErrors} company scan${batchErrors === 1 ? "" : "s"} failed`}
+              {!batchRunning && batchJobsFound > 0 && (
+                <>
+                  {" — "}
+                  <Link href="/jobs" className="text-primary underline underline-offset-4">
+                    review open roles →
+                  </Link>
+                </>
+              )}
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader className="space-y-4">

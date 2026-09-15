@@ -17,13 +17,17 @@ export type GenerateParams = {
 
 export function EmailGenerator({
   onGenerate,
+  onGenerateLinkedIn,
   isGenerating,
+  isGeneratingLinkedIn,
   initialCompanyId,
   initialJobTitle,
   initialJobUrl,
 }: {
   onGenerate: (params: GenerateParams) => void;
+  onGenerateLinkedIn?: (params: GenerateParams) => void;
   isGenerating: boolean;
+  isGeneratingLinkedIn?: boolean;
   initialCompanyId?: string;
   initialJobTitle?: string;
   initialJobUrl?: string;
@@ -114,28 +118,52 @@ export function EmailGenerator({
           </div>
         )}
       </CardContent>
-      <CardFooter className="flex justify-between border-t border-hairline-light pt-4">
+      <CardFooter className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-hairline-light pt-4">
         <span className="text-xs text-shade-40">Powered by OpenAI</span>
-        <Button
-          variant="primary"
-          disabled={isGenerating || !selected}
-          onClick={() =>
-            onGenerate({
-              companyId: selected,
-              jobTitle: jobTitle || undefined,
-              jobUrl: jobUrl || undefined,
-              jobDescription: jobDescription || undefined,
-            })
-          }
-        >
-          {isGenerating ? (
-            <span className="flex items-center gap-2">
-              <RefreshCw className="w-4 h-4 animate-spin" /> Generating Draft...
-            </span>
-          ) : (
-            "Generate Personalized Draft"
+        <div className="flex flex-col sm:flex-row gap-2">
+          {onGenerateLinkedIn && (
+            <Button
+              variant="outline-light"
+              disabled={isGeneratingLinkedIn || !selected}
+              onClick={() =>
+                onGenerateLinkedIn({
+                  companyId: selected,
+                  jobTitle: jobTitle || undefined,
+                  jobUrl: jobUrl || undefined,
+                  jobDescription: jobDescription || undefined,
+                })
+              }
+            >
+              {isGeneratingLinkedIn ? (
+                <span className="flex items-center gap-2">
+                  <RefreshCw className="w-4 h-4 animate-spin" /> Generating...
+                </span>
+              ) : (
+                "Generate LinkedIn Message"
+              )}
+            </Button>
           )}
-        </Button>
+          <Button
+            variant="primary"
+            disabled={isGenerating || !selected}
+            onClick={() =>
+              onGenerate({
+                companyId: selected,
+                jobTitle: jobTitle || undefined,
+                jobUrl: jobUrl || undefined,
+                jobDescription: jobDescription || undefined,
+              })
+            }
+          >
+            {isGenerating ? (
+              <span className="flex items-center gap-2">
+                <RefreshCw className="w-4 h-4 animate-spin" /> Generating Draft...
+              </span>
+            ) : (
+              "Generate Personalized Draft"
+            )}
+          </Button>
+        </div>
       </CardFooter>
     </Card>
   );

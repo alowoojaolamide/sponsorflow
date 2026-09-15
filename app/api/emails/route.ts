@@ -63,7 +63,7 @@ export async function POST(req: Request) {
         subject,
         body: emailBody,
         status: "draft",
-        ai_model: "claude-sonnet-4-5",
+        ai_model: "gpt-4o-mini",
         ai_positioning_angle: positioning_angle ?? null,
         ai_confidence: confidence ?? null,
         job_title: job_title ?? null,
