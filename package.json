@@ -10,7 +10,6 @@
     "verify-schema": "node scripts/verify-schema.mjs"
   },
   "dependencies": {
-    "openai": "^7.15.0",
     "@hookform/resolvers": "^3.9.0",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.45.4",
@@ -19,11 +18,13 @@
     "docx": "^9.7.1",
     "lucide-react": "^0.441.0",
     "mammoth": "^1.12.3",
-    "pdf-parse": "^2.4.5",
     "next": "^14.2.11",
+    "openai": "^7.15.0",
+    "pdf-parse": "^2.4.5",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-hook-form": "^7.53.0",
+    "recharts": "^3.10.1",
     "tailwind-merge": "^2.5.2",
     "zod": "^3.23.8"
   },

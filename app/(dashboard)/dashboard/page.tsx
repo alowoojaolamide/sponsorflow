@@ -3,6 +3,11 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { DashboardStats } from "@/components/dashboard/DashboardStats";
+import { VolumeStats } from "@/components/dashboard/VolumeStats";
+import { ActivityChart } from "@/components/dashboard/ActivityChart";
+import { IndustryBreakdownChart } from "@/components/dashboard/IndustryBreakdownChart";
+import { RecentJobsList } from "@/components/dashboard/RecentJobsList";
+import { RecentDraftsList } from "@/components/dashboard/RecentDraftsList";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
@@ -51,9 +56,22 @@ export default function DashboardHomePage() {
         </Card>
       )}
 
+      <VolumeStats />
       <DashboardStats />
 
-      <div className="flex gap-3">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <ActivityChart />
+        </div>
+        <IndustryBreakdownChart />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <RecentJobsList />
+        <RecentDraftsList />
+      </div>
+
+      <div className="flex flex-wrap gap-3">
         <Link href="/companies"><Button variant="outline-light" size="sm">Companies</Button></Link>
         <Link href="/emails"><Button variant="outline-light" size="sm">Generate Emails</Button></Link>
         <Link href="/emails/pending"><Button variant="outline-light" size="sm">Pending Approvals</Button></Link>
