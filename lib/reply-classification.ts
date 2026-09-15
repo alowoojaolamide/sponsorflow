@@ -1,4 +1,4 @@
-import { callClaude, parseClaudeJson, isClaudeConfigured } from "@/lib/claude-client";
+import { callAI, parseAIJson, isAIConfigured } from "@/lib/ai-client";
 
 export type ReplyClassification = {
   classification: "positive" | "interested" | "rejection" | "question" | "other";
@@ -7,8 +7,8 @@ export type ReplyClassification = {
 };
 
 export async function classifyReply(replyBody: string): Promise<ReplyClassification> {
-  if (!isClaudeConfigured()) {
-    // Without Claude configured, fall back to "other" rather than blocking ingestion.
+  if (!isAIConfigured()) {
+    // Without the AI provider configured, fall back to "other" rather than blocking ingestion.
     return { classification: "other", confidence: 0, summary: "AI classification not configured." };
   }
 
@@ -19,8 +19,8 @@ REPLY:
 ${replyBody}`;
 
   try {
-    const raw = await callClaude(prompt, 300);
-    return parseClaudeJson<ReplyClassification>(raw);
+    const raw = await callAI(prompt, 300);
+    return parseAIJson<ReplyClassification>(raw);
   } catch {
     return { classification: "other", confidence: 0, summary: "Could not parse classification." };
   }

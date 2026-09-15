@@ -1,5 +1,5 @@
 import { extractTextFromUrl } from "@/lib/document-extract";
-import { callClaude, parseClaudeJson, isClaudeConfigured } from "@/lib/claude-client";
+import { callAI, parseAIJson, isAIConfigured } from "@/lib/ai-client";
 
 export type DiscoveredJob = {
   source: "greenhouse" | "lever" | "career_page";
@@ -111,7 +111,7 @@ async function findAtsSlugFromCareerPage(url: string): Promise<{ source: "greenh
 }
 
 async function extractJobsFromCareerPageWithAI(url: string): Promise<DiscoveredJob[]> {
-  if (!isClaudeConfigured()) return [];
+  if (!isAIConfigured()) return [];
 
   const text = await extractTextFromUrl(url);
   if (!text) return [];
@@ -125,8 +125,8 @@ Respond with ONLY valid JSON, no markdown fences:
 {"jobs": [{"title": "...", "location": "..."|null}]}`;
 
   try {
-    const raw = await callClaude(prompt, 800);
-    const parsed = parseClaudeJson<{ jobs: { title: string; location: string | null }[] }>(raw);
+    const raw = await callAI(prompt, 800);
+    const parsed = parseAIJson<{ jobs: { title: string; location: string | null }[] }>(raw);
     return (parsed.jobs ?? []).map((j) => ({
       source: "career_page" as const,
       external_id: `${url}::${j.title}`,

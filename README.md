@@ -1,7 +1,7 @@
 # SponsorFlow
 
 A personal AI-powered UK job acquisition engine: import a list of UK tech
-sponsors, generate personalized outreach emails with Claude using your real
+sponsors, generate personalized outreach emails with OpenAI using your real
 background, review and approve every email before it sends, and track
 replies and pipeline in one dashboard.
 
@@ -20,7 +20,7 @@ All 12 phases of the prompt pack are implemented:
 | Google sign-in | ✅ Code complete — needs a Google Cloud OAuth client |
 | 10-step onboarding + DOCX template | ✅ |
 | CSV import + dedup | ✅ |
-| AI email generation (Claude) | ✅ Code complete — needs `ANTHROPIC_API_KEY` |
+| AI email generation (OpenAI) | ✅ Code complete — needs `OPENAI_API_KEY` |
 | Email approval workflow | ✅ |
 | Gmail connection | ✅ Code complete — needs a Google Cloud OAuth client |
 | Send + rate limiting | ✅ |
@@ -34,7 +34,7 @@ clear error message rather than crashing until that credential is added to
 ## Tech stack
 
 Next.js 14 (App Router) + TypeScript + Tailwind · Supabase (Postgres, Auth,
-RLS) · Claude API · Gmail API.
+RLS) · OpenAI API · Gmail API.
 
 ## Running locally
 
@@ -58,7 +58,7 @@ against the shared Supabase project you'll need:
 Ask a teammate for these rather than creating a second Supabase project —
 migrations and RLS policies are already deployed to the shared one.
 
-The rest (`GOOGLE_CLIENT_ID`/`SECRET`, `ANTHROPIC_API_KEY`,
+The rest (`GOOGLE_CLIENT_ID`/`SECRET`, `OPENAI_API_KEY`,
 `GMAIL_PUBSUB_TOPIC`, `GMAIL_WEBHOOK_SECRET`) are optional for local
 development; those features degrade gracefully with a clear "not
 configured" message when left as placeholders.

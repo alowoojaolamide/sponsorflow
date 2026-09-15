@@ -11,7 +11,7 @@ export async function POST(req: Request) {
 
   if (!isAutofillConfigured()) {
     return NextResponse.json(
-      { error: "Profile autofill is not configured yet (ANTHROPIC_API_KEY missing)." },
+      { error: "Profile autofill is not configured yet (OPENAI_API_KEY missing)." },
       { status: 503 }
     );
   }

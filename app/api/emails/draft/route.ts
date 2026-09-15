@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createSupabaseRouteClient } from "@/lib/supabase-server";
 import { getCurrentUser } from "@/lib/auth";
 import { getFullProfile } from "@/lib/db";
-import { generateEmailDraft, isClaudeConfigured } from "@/lib/ai-email";
+import { generateEmailDraft, isAIConfigured } from "@/lib/ai-email";
 
 export async function POST(req: Request) {
   const user = await getCurrentUser();
@@ -10,9 +10,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if (!isClaudeConfigured()) {
+  if (!isAIConfigured()) {
     return NextResponse.json(
-      { error: "AI email generation is not configured yet (ANTHROPIC_API_KEY missing)." },
+      { error: "AI email generation is not configured yet (OPENAI_API_KEY missing)." },
       { status: 503 }
     );
   }

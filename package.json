@@ -10,7 +10,7 @@
     "verify-schema": "node scripts/verify-schema.mjs"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.124.0",
+    "openai": "^7.15.0",
     "@hookform/resolvers": "^3.9.0",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.45.4",

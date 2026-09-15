@@ -1,7 +1,7 @@
 import type { Tables } from "@/types/database";
-import { callClaude, parseClaudeJson, isClaudeConfigured } from "@/lib/claude-client";
+import { callAI, parseAIJson, isAIConfigured } from "@/lib/ai-client";
 
-export { isClaudeConfigured };
+export { isAIConfigured };
 
 export type EmailDraft = {
   subject: string;
@@ -83,13 +83,13 @@ export async function generateEmailDraft(
   const project = projects[0] ?? null;
   const prompt = buildPrompt(profile, positioning, project, company, job);
 
-  const raw = await callClaude(prompt, 600);
+  const raw = await callAI(prompt, 600);
 
   let parsed: EmailDraft;
   try {
-    parsed = parseClaudeJson<EmailDraft>(raw);
+    parsed = parseAIJson<EmailDraft>(raw);
   } catch {
-    throw new Error("Claude returned an unparseable response. Try regenerating.");
+    throw new Error("The AI returned an unparseable response. Try regenerating.");
   }
 
   return {

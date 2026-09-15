@@ -115,7 +115,7 @@ export function EmailGenerator({
         )}
       </CardContent>
       <CardFooter className="flex justify-between border-t border-hairline-light pt-4">
-        <span className="text-xs text-shade-40">Powered by Anthropic Claude API</span>
+        <span className="text-xs text-shade-40">Powered by OpenAI</span>
         <Button
           variant="primary"
           disabled={isGenerating || !selected}

@@ -1,6 +1,6 @@
-import { callClaude, parseClaudeJson, isClaudeConfigured } from "@/lib/claude-client";
+import { callAI, parseAIJson, isAIConfigured } from "@/lib/ai-client";
 
-export { isClaudeConfigured as isAutofillConfigured };
+export { isAIConfigured as isAutofillConfigured };
 
 export type AutofillResult = {
   profile: {
@@ -72,10 +72,10 @@ Extract and respond with ONLY valid JSON, no markdown fences, in this exact shap
   ]
 }`;
 
-  const raw = await callClaude(prompt, 2000);
+  const raw = await callAI(prompt, 2000);
 
   try {
-    return parseClaudeJson<AutofillResult>(raw);
+    return parseAIJson<AutofillResult>(raw);
   } catch {
     throw new Error("Could not parse the extracted profile. Try again or fill the form manually.");
   }

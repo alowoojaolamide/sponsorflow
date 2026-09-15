@@ -118,7 +118,7 @@ export default function LandingPage() {
               <div className="w-10 h-10 rounded-pill bg-hairline-dark flex items-center justify-center text-aloe-10">
                 <Sparkles className="w-5 h-5" />
               </div>
-              <h3 className="text-xl font-medium font-display text-on-primary">2. Claude AI Personalization</h3>
+              <h3 className="text-xl font-medium font-display text-on-primary">2. AI Personalization</h3>
               <p className="text-sm text-shade-40 leading-relaxed">
                 Connects your verified project impact to the company&apos;s specific niche (Fintech, Health, SaaS). Strict 70–150 word limit with zero corporate fluff.
               </p>
