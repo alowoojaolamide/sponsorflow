@@ -173,7 +173,7 @@ function EmailsPageInner() {
       </div>
 
       {error && (
-        <div className="p-3 rounded-md bg-red-50 border border-red-200 text-sm text-red-700 max-w-2xl">
+        <div className="p-3 rounded-md bg-red-50 border border-red-200 text-sm text-red-700 dark:bg-red-950/40 dark:border-red-800/60 dark:text-red-300 max-w-2xl">
           {error}
         </div>
       )}

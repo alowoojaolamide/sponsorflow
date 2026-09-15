@@ -27,9 +27,9 @@ export default function DashboardHomePage() {
       </div>
 
       {profile?.profile && !profile.profile.onboarding_complete && (
-        <Card className="border-amber-200 bg-amber-50">
+        <Card className="border-amber-200 bg-amber-50 dark:border-amber-800/60 dark:bg-amber-950/30">
           <CardContent className="py-4 flex items-center justify-between">
-            <p className="text-sm text-amber-800">
+            <p className="text-sm text-amber-800 dark:text-amber-300">
               Your profile is {profile.profile.profile_complete_percent}% complete. Finish onboarding to
               unlock personalized email generation.
             </p>

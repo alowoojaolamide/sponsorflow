@@ -31,8 +31,8 @@ export function Sidebar() {
               className={cn(
                 "flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-medium transition-colors",
                 isActive
-                  ? "bg-primary text-on-primary"
-                  : "text-shade-60 hover:bg-slate-100 hover:text-ink"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-shade-60 hover:bg-hairline-light hover:text-ink"
               )}
             >
               <Icon className="w-4 h-4 shrink-0" />

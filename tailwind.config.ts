@@ -17,8 +17,8 @@ const config: Config = {
         // Theme-aware tokens (see app/globals.css :root / .dark) — these
         // automatically respond to the dark mode toggle everywhere.
         primary: withOpacity("--primary"),
+        "primary-foreground": withOpacity("--primary-foreground"),
         ink: withOpacity("--ink"),
-        "on-primary": withOpacity("--on-primary"),
         "canvas-light": withOpacity("--canvas-light"),
         "canvas-cream": withOpacity("--canvas-cream"),
         "hairline-light": withOpacity("--hairline-light"),
@@ -33,6 +33,11 @@ const config: Config = {
         },
         // Fixed (not theme-aware) — the marketing landing page's cinematic
         // dark hero keeps this look regardless of the light/dark toggle.
+        // on-primary specifically: text/border color for permanently-dark
+        // surfaces (landing hero, "cinematic" card, "outline-dark" button) —
+        // do not confuse with primary-foreground above, which flips with
+        // the `primary` dashboard button surface.
+        "on-primary": "#ffffff",
         "on-dark": "#ffffff",
         "canvas-night": "#000000",
         "canvas-night-elevated": "#0a0a0a",

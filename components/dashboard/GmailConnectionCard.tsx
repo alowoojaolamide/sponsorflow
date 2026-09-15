@@ -27,7 +27,7 @@ export function GmailConnectionCard() {
       </CardHeader>
       <CardContent className="space-y-3">
         {error && (
-          <p className="text-xs text-red-600">
+          <p className="text-xs text-red-600 dark:text-red-400">
             Gmail connection failed: {decodeURIComponent(error)}
           </p>
         )}
@@ -38,7 +38,7 @@ export function GmailConnectionCard() {
             Gmail sending isn&apos;t configured yet — a Google Cloud OAuth client needs to be set up first.
           </p>
         ) : status.connected ? (
-          <div className="flex items-center gap-2 text-sm text-emerald-700">
+          <div className="flex items-center gap-2 text-sm text-emerald-700 dark:text-emerald-400">
             <CheckCircle2 className="w-4 h-4" /> Connected as {status.gmail_email}
           </div>
         ) : (

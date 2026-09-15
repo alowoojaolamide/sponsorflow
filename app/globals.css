@@ -3,6 +3,7 @@
 @tailwind utilities;
 
 :root {
+  color-scheme: light;
   --font-inter: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-display: "NeueHaasGrotesk Display", "Inter Display", -apple-system, BlinkMacSystemFont, sans-serif;
 
@@ -15,7 +16,11 @@
   --ink: 0 0 0;
   --hairline-light: 228 228 231;
   --primary: 0 0 0;
-  --on-primary: 255 255 255;
+  /* Text/border color paired with the `primary` button surface — flips
+     with it so button contrast holds in both themes. NOT the same thing
+     as the fixed `on-primary` token below (that one is for permanently-
+     dark surfaces like the landing page hero, and must never flip). */
+  --primary-foreground: 255 255 255;
   --shade-30: 212 212 216;
   --shade-40: 161 161 170;
   --shade-50: 113 113 122;
@@ -26,12 +31,13 @@
 }
 
 .dark {
+  color-scheme: dark;
   --canvas-cream: 17 18 20;
   --canvas-light: 26 28 31;
   --ink: 237 237 240;
   --hairline-light: 45 47 51;
   --primary: 237 237 240;
-  --on-primary: 17 18 20;
+  --primary-foreground: 17 18 20;
   --shade-30: 63 63 70;
   --shade-40: 124 124 133;
   --shade-50: 154 154 164;
@@ -70,7 +76,7 @@ body {
 /* Button variants from design spec */
 .btn-primary-pill {
   background-color: rgb(var(--primary));
-  color: rgb(var(--on-primary));
+  color: rgb(var(--primary-foreground));
 }
 .btn-primary-pill:hover {
   background-color: rgb(var(--shade-70));

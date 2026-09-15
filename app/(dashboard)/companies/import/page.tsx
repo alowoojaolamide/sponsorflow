@@ -180,11 +180,11 @@ export default function CompanyImportPage() {
       )}
 
       {error && (
-        <div className="p-3 rounded-md bg-red-50 border border-red-200 text-sm text-red-700 max-w-4xl">{error}</div>
+        <div className="p-3 rounded-md bg-red-50 border border-red-200 text-sm text-red-700 dark:bg-red-950/40 dark:border-red-800/60 dark:text-red-300 max-w-4xl">{error}</div>
       )}
 
       {result && (
-        <div className="p-3 rounded-md bg-emerald-50 border border-emerald-200 text-sm text-emerald-700 max-w-4xl">
+        <div className="p-3 rounded-md bg-emerald-50 border border-emerald-200 text-sm text-emerald-700 dark:bg-emerald-950/40 dark:border-emerald-800/60 dark:text-emerald-300 max-w-4xl">
           Imported {result.imported.toLocaleString()} of {result.total.toLocaleString()} companies (
           {result.duplicates.toLocaleString()} duplicates handled). Redirecting...
         </div>

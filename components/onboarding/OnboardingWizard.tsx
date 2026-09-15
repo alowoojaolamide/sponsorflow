@@ -460,7 +460,7 @@ export function OnboardingWizard({ step }: { step: number }) {
 
       <Card className="p-8">
         {error && (
-          <div className="p-3 mb-4 rounded-md bg-red-50 border border-red-200 text-sm text-red-700">
+          <div className="p-3 mb-4 rounded-md bg-red-50 border border-red-200 text-sm text-red-700 dark:bg-red-950/40 dark:border-red-800/60 dark:text-red-300">
             {error}
           </div>
         )}
@@ -533,12 +533,12 @@ function AutofillPanel({ onResult }: { onResult: (result: AutofillResult) => voi
       {open && (
         <div className="mt-4 space-y-3 border-t border-hairline-light pt-4">
           {error && (
-            <div className="p-2.5 rounded-md bg-red-50 border border-red-200 text-xs text-red-700">
+            <div className="p-2.5 rounded-md bg-red-50 border border-red-200 text-xs text-red-700 dark:bg-red-950/40 dark:border-red-800/60 dark:text-red-300">
               {error}
             </div>
           )}
           {success && !error && (
-            <div className="p-2.5 rounded-md bg-emerald-50 border border-emerald-200 text-xs text-emerald-700">
+            <div className="p-2.5 rounded-md bg-emerald-50 border border-emerald-200 text-xs text-emerald-700 dark:bg-emerald-950/40 dark:border-emerald-800/60 dark:text-emerald-300">
               Profile pre-filled. Click Next to review each step.
             </div>
           )}

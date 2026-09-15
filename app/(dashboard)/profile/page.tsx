@@ -70,7 +70,7 @@ export default function ProfilePage() {
                   </span>
                 ))}
                 {profile?.requires_sponsorship && (
-                  <span className="px-2.5 py-1 rounded-pill bg-slate-100 text-ink text-xs font-medium">
+                  <span className="px-2.5 py-1 rounded-pill bg-hairline-light text-ink text-xs font-medium">
                     UK Visa Sponsorship Required
                   </span>
                 )}
