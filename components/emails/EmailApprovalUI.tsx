@@ -63,7 +63,7 @@ export function EmailApprovalUI({
         <div className="flex items-center justify-between">
           <div>
             {draft.ai_positioning_angle && (
-              <span className="text-xs font-semibold px-2.5 py-1 rounded-pill bg-aloe-10 text-ink">
+              <span className="text-xs font-semibold px-2.5 py-1 rounded-pill bg-aloe-10 text-on-aloe">
                 {draft.ai_positioning_angle} Positioning
               </span>
             )}

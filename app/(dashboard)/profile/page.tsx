@@ -46,9 +46,9 @@ export default function ProfilePage() {
             </p>
           )}
         </div>
-        <Link href="/onboarding/step-1">
+        <Link href={profile?.onboarding_complete ? "/onboarding/step-10" : "/onboarding/step-1"}>
           <Button variant="primary" size="sm">
-            {profile?.onboarding_complete ? "Edit 10-Step Profile" : "Complete your profile →"}
+            {profile?.onboarding_complete ? "Edit Profile" : "Complete your profile →"}
           </Button>
         </Link>
       </div>
@@ -65,7 +65,7 @@ export default function ProfilePage() {
             {data && data.industries.length > 0 && (
               <div className="pt-2 flex flex-wrap gap-2">
                 {data.industries.map((i) => (
-                  <span key={i.industry} className="px-2.5 py-1 rounded-pill bg-aloe-10 text-ink text-xs font-medium capitalize">
+                  <span key={i.industry} className="px-2.5 py-1 rounded-pill bg-aloe-10 text-on-aloe text-xs font-medium capitalize">
                     {i.industry} {i.years_experience ? `(${i.years_experience} yrs)` : ""}
                   </span>
                 ))}

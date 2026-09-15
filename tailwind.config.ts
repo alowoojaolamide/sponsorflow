@@ -39,6 +39,11 @@ const config: Config = {
         // the `primary` dashboard button surface.
         "on-primary": "#ffffff",
         "on-dark": "#ffffff",
+        // Fixed dark text for the aloe/pistachio green pill backgrounds —
+        // those greens stay light in both themes, so pairing them with the
+        // theme-flipping `ink` token (white in dark mode) makes the text
+        // unreadable. Never flips, unlike `ink`.
+        "on-aloe": "#000000",
         "canvas-night": "#000000",
         "canvas-night-elevated": "#0a0a0a",
         "surface-elevated-dark": "#1e2c31",

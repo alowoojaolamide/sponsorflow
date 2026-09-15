@@ -14,8 +14,8 @@ export function Card({
   const variantStyles = {
     light: "bg-canvas-light text-ink border border-hairline-light rounded-lg shadow-paper-halo",
     cinematic: "bg-canvas-night-elevated text-on-primary border border-hairline-dark rounded-lg shadow-cinematic-inset",
-    "featured-aloe": "bg-aloe-10 text-ink border border-emerald-300 rounded-lg shadow-paper-halo",
-    "pistachio-band": "bg-pistachio-10 text-ink border border-green-200 rounded-lg p-8",
+    "featured-aloe": "bg-aloe-10 text-on-aloe border border-emerald-300 rounded-lg shadow-paper-halo",
+    "pistachio-band": "bg-pistachio-10 text-on-aloe border border-green-200 rounded-lg p-8",
   };
 
   return (

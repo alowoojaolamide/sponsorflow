@@ -9,6 +9,19 @@ import { Sparkles } from "lucide-react";
 
 const TOTAL_STEPS = 10;
 
+const STEP_TITLES = [
+  "Welcome",
+  "Basic Info",
+  "Professional Background",
+  "Skills",
+  "Key Projects",
+  "Sponsorship & Legal",
+  "Fintech Positioning",
+  "Healthcare Positioning",
+  "Your Story",
+  "Review & Confirm",
+];
+
 const INDUSTRIES = ["fintech", "healthcare", "saas", "marketplace", "ecommerce", "other"];
 const DESIGN_SKILLS = [
   "User Research",
@@ -434,6 +447,17 @@ export function OnboardingWizard({ step }: { step: number }) {
     if (step > 1) router.push(`/onboarding/step-${step - 1}`);
   }
 
+  async function jumpToStep(target: number) {
+    if (target === step) return;
+    setError(null);
+    try {
+      await save(false);
+      router.push(`/onboarding/step-${target}`);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to save");
+    }
+  }
+
   if (!loaded) {
     return <div className="text-center text-sm text-shade-50 py-20">Loading your profile...</div>;
   }
@@ -443,16 +467,34 @@ export function OnboardingWizard({ step }: { step: number }) {
       <div>
         <div className="flex items-center justify-between text-xs text-shade-50 mb-2">
           <span>
-            Step {step} / {TOTAL_STEPS}
+            Step {step} / {TOTAL_STEPS} — {STEP_TITLES[step - 1]}
           </span>
           {saveStatus === "saving" && <span>Saving...</span>}
           {saveStatus === "saved" && <span className="text-emerald-600">✓ Saved</span>}
         </div>
-        <div className="w-full h-1.5 rounded-pill bg-hairline-light overflow-hidden">
-          <div
-            className="h-full bg-primary transition-all"
-            style={{ width: `${(step / TOTAL_STEPS) * 100}%` }}
-          />
+        <div className="flex items-center gap-1.5">
+          {STEP_TITLES.map((title, i) => {
+            const n = i + 1;
+            const isCurrent = n === step;
+            const isDone = n < step;
+            return (
+              <button
+                key={n}
+                type="button"
+                title={title}
+                aria-label={`Jump to step ${n}: ${title}`}
+                aria-current={isCurrent ? "step" : undefined}
+                onClick={() => jumpToStep(n)}
+                className={`h-1.5 flex-1 rounded-pill transition-all ${
+                  isCurrent
+                    ? "bg-primary"
+                    : isDone
+                    ? "bg-primary/50 hover:bg-primary/70"
+                    : "bg-hairline-light hover:bg-shade-30"
+                }`}
+              />
+            );
+          })}
         </div>
       </div>
 

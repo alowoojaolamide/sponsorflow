@@ -23,7 +23,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         "bg-canvas-night text-on-primary border-2 border-on-primary hover:bg-on-primary hover:text-canvas-night focus-visible:ring-on-primary",
       "outline-light":
         "bg-canvas-light text-ink border border-ink hover:bg-hairline-light focus-visible:ring-ink",
-      aloe: "bg-aloe-10 text-ink hover:bg-[#a9f5c2] focus-visible:ring-aloe-10",
+      aloe: "bg-aloe-10 text-on-aloe hover:bg-[#a9f5c2] focus-visible:ring-aloe-10",
       ghost: "bg-transparent text-ink hover:bg-hairline-light focus-visible:ring-ink",
     };
 

@@ -23,7 +23,7 @@ export function Header() {
             SPONSOR<span className="text-emerald-600 font-extrabold">FLOW</span>
           </span>
         </Link>
-        <span className="hidden sm:inline-block px-2.5 py-0.5 text-xs font-semibold rounded-pill bg-aloe-10 text-ink">
+        <span className="hidden sm:inline-block px-2.5 py-0.5 text-xs font-semibold rounded-pill bg-aloe-10 text-on-aloe">
           UK Visa Pipeline
         </span>
       </div>
