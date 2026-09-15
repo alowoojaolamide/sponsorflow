@@ -1,8 +1,25 @@
+let pdfWorkerConfigured = false;
+
+/**
+ * pdf-parse's default worker discovery looks for a pdf.worker.mjs file on
+ * disk, which doesn't survive Vercel's serverless file tracing. `getData()`
+ * returns the worker script pre-embedded as a base64 data: URL, so pointing
+ * pdfjs at that avoids any filesystem lookup entirely.
+ */
+async function ensurePdfWorkerConfigured() {
+  if (pdfWorkerConfigured) return;
+  const { PDFParse } = await import("pdf-parse");
+  const { getData } = await import("pdf-parse/worker");
+  PDFParse.setWorker(getData());
+  pdfWorkerConfigured = true;
+}
+
 /** Extracts plain text from an uploaded CV/resume file (PDF or DOCX). */
 export async function extractTextFromFile(file: File): Promise<string> {
   const buffer = Buffer.from(await file.arrayBuffer());
 
   if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
+    await ensurePdfWorkerConfigured();
     const { PDFParse } = await import("pdf-parse");
     const parser = new PDFParse({ data: buffer });
     const result = await parser.getText();
