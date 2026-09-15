@@ -20,6 +20,10 @@ export async function GET(req: Request) {
   const order = searchParams.get("order") === "asc" ? "asc" : "desc";
   const scannedParam = searchParams.get("scanned");
   const scanned = scannedParam === "false" ? false : scannedParam === "true" ? true : undefined;
+  const researchedParam = searchParams.get("researched");
+  const researched = researchedParam === "false" ? false : researchedParam === "true" ? true : undefined;
+  const hasWebsiteParam = searchParams.get("has_website");
+  const hasWebsite = hasWebsiteParam === "false" ? false : hasWebsiteParam === "true" ? true : undefined;
 
   const supabase = createSupabaseRouteClient();
   const { companies, total } = await getCompanies(supabase, user.id, {
@@ -31,6 +35,8 @@ export async function GET(req: Request) {
     sort,
     order,
     scanned,
+    researched,
+    hasWebsite,
   });
 
   return NextResponse.json({ companies, total, limit, offset });

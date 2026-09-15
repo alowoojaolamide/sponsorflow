@@ -197,6 +197,8 @@ export async function getCompanies(
     sort?: SortableColumn;
     order?: "asc" | "desc";
     scanned?: boolean;
+    researched?: boolean;
+    hasWebsite?: boolean;
   } = {}
 ): Promise<{ companies: Tables<"companies">[]; total: number }> {
   const limit = options.limit ?? 50;
@@ -219,6 +221,16 @@ export async function getCompanies(
     query = query.is("jobs_scanned_at", null);
   } else if (options.scanned === true) {
     query = query.not("jobs_scanned_at", "is", null);
+  }
+  if (options.researched === false) {
+    query = query.is("researched_at", null);
+  } else if (options.researched === true) {
+    query = query.not("researched_at", "is", null);
+  }
+  if (options.hasWebsite === false) {
+    query = query.is("website", null);
+  } else if (options.hasWebsite === true) {
+    query = query.not("website", "is", null);
   }
 
   const { data, error, count } = await query

@@ -18,6 +18,7 @@ import {
   Radar,
   X,
   CheckCircle2,
+  Globe,
 } from "lucide-react";
 
 type Company = {
@@ -29,6 +30,7 @@ type Company = {
   personalization_hook: string | null;
   status: string;
   jobs_scanned_at: string | null;
+  researched_at: string | null;
 };
 
 // Companies API caps `limit` at 2000 per request server-side, so scanning
@@ -47,6 +49,8 @@ export default function CompaniesPage() {
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState<string | null>(null);
   const [scanResult, setScanResult] = useState<Record<string, string>>({});
+  const [researchingRow, setResearchingRow] = useState<string | null>(null);
+  const [researchRowResult, setResearchRowResult] = useState<Record<string, string>>({});
 
   const [batchRunning, setBatchRunning] = useState(false);
   const [batchFetchingTargets, setBatchFetchingTargets] = useState(false);
@@ -57,6 +61,16 @@ export default function CompaniesPage() {
   const [rescanAll, setRescanAll] = useState(false);
   const [unscannedCount, setUnscannedCount] = useState<number | null>(null);
   const batchCancelRef = React.useRef(false);
+
+  const [researchRunning, setResearchRunning] = useState(false);
+  const [researchFetchingTargets, setResearchFetchingTargets] = useState(false);
+  const [researchDone, setResearchDone] = useState(0);
+  const [researchTotal, setResearchTotal] = useState(0);
+  const [researchFoundCount, setResearchFoundCount] = useState(0);
+  const [researchErrors, setResearchErrors] = useState(0);
+  const [reresearchAll, setReresearchAll] = useState(false);
+  const [unresearchedCount, setUnresearchedCount] = useState<number | null>(null);
+  const researchCancelRef = React.useRef(false);
 
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
@@ -105,6 +119,18 @@ export default function CompaniesPage() {
       .catch(() => setUnscannedCount(null));
   }, [search, statusFilter, batchRunning]);
 
+  // Same, for the "Research Companies" button — only companies missing a
+  // website need this at all.
+  useEffect(() => {
+    const params = new URLSearchParams({ limit: "1", has_website: "false", researched: "false" });
+    if (search) params.set("search", search);
+    if (statusFilter) params.set("status", statusFilter);
+    fetch(`/api/companies?${params.toString()}`)
+      .then((res) => res.json())
+      .then((data) => setUnresearchedCount(data.total ?? 0))
+      .catch(() => setUnresearchedCount(null));
+  }, [search, statusFilter, researchRunning]);
+
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   function toggleSort(column: SortColumn) {
@@ -151,21 +177,21 @@ export default function CompaniesPage() {
     }
   }
 
-  // Fetches every company matching the current filters (paginating past the
-  // API's 2000-per-request cap) so the batch scan covers a full 100k+ list.
-  async function fetchAllTargets(onlyUnscanned: boolean): Promise<Company[]> {
+  // Fetches every company matching the current filters plus `extraParams`
+  // (paginating past the API's 2000-per-request cap) so a batch action
+  // covers a full 100k+ list, not just the first page.
+  async function fetchAllTargets(extraParams: Record<string, string>, isCancelled: () => boolean): Promise<Company[]> {
     const all: Company[] = [];
     let offset = 0;
     for (;;) {
-      const params = new URLSearchParams({ limit: String(FETCH_PAGE_SIZE), offset: String(offset) });
+      const params = new URLSearchParams({ limit: String(FETCH_PAGE_SIZE), offset: String(offset), ...extraParams });
       if (search) params.set("search", search);
       if (statusFilter) params.set("status", statusFilter);
-      if (onlyUnscanned) params.set("scanned", "false");
       const res = await fetch(`/api/companies?${params.toString()}`);
       const data = await res.json();
       const batch: Company[] = data.companies ?? [];
       all.push(...batch);
-      if (batchCancelRef.current || batch.length < FETCH_PAGE_SIZE) break;
+      if (isCancelled() || batch.length < FETCH_PAGE_SIZE) break;
       offset += FETCH_PAGE_SIZE;
     }
     return all;
@@ -181,7 +207,7 @@ export default function CompaniesPage() {
     setBatchTotal(0);
 
     try {
-      const targets = await fetchAllTargets(!rescanAll);
+      const targets = await fetchAllTargets(rescanAll ? {} : { scanned: "false" }, () => batchCancelRef.current);
       setBatchFetchingTargets(false);
       setBatchTotal(targets.length);
 
@@ -212,6 +238,68 @@ export default function CompaniesPage() {
     }
   }
 
+  async function handleResearchOne(companyId: string) {
+    const res = await fetch(`/api/companies/${companyId}/research`, { method: "POST" });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Research failed");
+    if (data.company) {
+      setCompanies((cs) => cs.map((c) => (c.id === companyId ? { ...c, ...data.company } : c)));
+    }
+    return data;
+  }
+
+  async function handleResearchRow(companyId: string) {
+    setResearchingRow(companyId);
+    setResearchRowResult((r) => ({ ...r, [companyId]: "" }));
+    try {
+      const data = await handleResearchOne(companyId);
+      setResearchRowResult((r) => ({
+        ...r,
+        [companyId]: data.found ? "Website found" : "Couldn't confidently identify a website",
+      }));
+    } catch (err: unknown) {
+      setResearchRowResult((r) => ({ ...r, [companyId]: err instanceof Error ? err.message : "Research failed" }));
+    } finally {
+      setResearchingRow(null);
+    }
+  }
+
+  async function handleBatchResearch() {
+    setResearchRunning(true);
+    setResearchFetchingTargets(true);
+    researchCancelRef.current = false;
+    setResearchDone(0);
+    setResearchFoundCount(0);
+    setResearchErrors(0);
+    setResearchTotal(0);
+
+    try {
+      const extraParams: Record<string, string> = { has_website: "false" };
+      if (!reresearchAll) extraParams.researched = "false";
+      const targets = await fetchAllTargets(extraParams, () => researchCancelRef.current);
+      setResearchFetchingTargets(false);
+      setResearchTotal(targets.length);
+
+      await runWithConcurrency(
+        targets,
+        4,
+        (company) => handleResearchOne(company.id),
+        (_company, _index, result, error) => {
+          setResearchDone((d) => d + 1);
+          if (error) {
+            setResearchErrors((e) => e + 1);
+          } else if (result?.found) {
+            setResearchFoundCount((n) => n + 1);
+          }
+        },
+        () => researchCancelRef.current
+      );
+    } finally {
+      setResearchFetchingTargets(false);
+      setResearchRunning(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -222,7 +310,25 @@ export default function CompaniesPage() {
           </p>
         </div>
         <div className="flex flex-col items-end gap-1.5">
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap justify-end">
+            <Button
+              variant="outline-light"
+              size="sm"
+              className="gap-2"
+              disabled={researchRunning || total === 0 || (unresearchedCount === 0 && !reresearchAll)}
+              onClick={handleBatchResearch}
+            >
+              <Globe className={`w-4 h-4 ${researchRunning ? "animate-pulse" : ""}`} />
+              {researchRunning
+                ? researchFetchingTargets
+                  ? "Finding companies to research..."
+                  : "Researching..."
+                : reresearchAll
+                ? "Re-research All"
+                : unresearchedCount != null
+                ? `Research Companies (${unresearchedCount.toLocaleString()} left)`
+                : "Research Companies"}
+            </Button>
             <Button
               variant="outline-light"
               size="sm"
@@ -252,18 +358,78 @@ export default function CompaniesPage() {
               </Button>
             </Link>
           </div>
-          <label className="flex items-center gap-1.5 text-xs text-shade-50 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={rescanAll}
-              disabled={batchRunning}
-              onChange={(e) => setRescanAll(e.target.checked)}
-              className="rounded border-hairline-light"
-            />
-            Re-scan already-scanned companies too
-          </label>
+          <div className="flex gap-4 flex-wrap justify-end">
+            <label className="flex items-center gap-1.5 text-xs text-shade-50 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={reresearchAll}
+                disabled={researchRunning}
+                onChange={(e) => setReresearchAll(e.target.checked)}
+                className="rounded border-hairline-light"
+              />
+              Re-research attempted companies too
+            </label>
+            <label className="flex items-center gap-1.5 text-xs text-shade-50 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={rescanAll}
+                disabled={batchRunning}
+                onChange={(e) => setRescanAll(e.target.checked)}
+                className="rounded border-hairline-light"
+              />
+              Re-scan already-scanned companies too
+            </label>
+          </div>
         </div>
       </div>
+
+      {(researchRunning || researchTotal > 0) && (
+        <Card className="border-primary/30">
+          <CardContent className="py-4 space-y-3">
+            <div className="flex items-center justify-between text-sm">
+              <span className="font-medium text-ink flex items-center gap-2">
+                <Globe className={`w-4 h-4 text-primary ${researchRunning ? "animate-pulse" : ""}`} />
+                {researchRunning
+                  ? researchFetchingTargets
+                    ? "Finding companies to research..."
+                    : `Researching companies via AI web search... (${researchDone}/${researchTotal})`
+                  : researchDone < researchTotal
+                  ? `Stopped — ${researchDone}/${researchTotal} checked. Click "Research Companies" again to resume.`
+                  : `Research complete — ${researchDone}/${researchTotal} companies checked`}
+              </span>
+              {researchRunning ? (
+                <button
+                  type="button"
+                  className="flex items-center gap-1 text-xs text-red-600 hover:underline"
+                  onClick={() => {
+                    researchCancelRef.current = true;
+                  }}
+                >
+                  <X className="w-3.5 h-3.5" /> Cancel
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="text-xs text-shade-50 hover:text-ink"
+                  onClick={() => setResearchTotal(0)}
+                >
+                  Dismiss
+                </button>
+              )}
+            </div>
+            <div className="w-full h-1.5 rounded-pill bg-hairline-light overflow-hidden">
+              <div
+                className="h-full bg-primary transition-all"
+                style={{ width: `${researchTotal ? (researchDone / researchTotal) * 100 : 0}%` }}
+              />
+            </div>
+            <p className="text-xs text-shade-50">
+              {researchFoundCount} website{researchFoundCount === 1 ? "" : "s"} found
+              {researchErrors > 0 && ` · ${researchErrors} lookup${researchErrors === 1 ? "" : "s"} failed`}
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {(batchRunning || batchTotal > 0) && (
         <Card className="border-primary/30">
@@ -415,10 +581,18 @@ export default function CompaniesPage() {
                         </div>
                         {scanResult[c.id] ? (
                           <p className="text-[11px] text-shade-40 mt-0.5">{scanResult[c.id]}</p>
+                        ) : c.jobs_scanned_at ? (
+                          <p className="text-[11px] text-shade-40 mt-0.5">
+                            Scanned {new Date(c.jobs_scanned_at).toLocaleDateString()}
+                          </p>
+                        ) : null}
+                        {researchRowResult[c.id] ? (
+                          <p className="text-[11px] text-shade-40 mt-0.5">{researchRowResult[c.id]}</p>
                         ) : (
-                          c.jobs_scanned_at && (
+                          !c.website &&
+                          c.researched_at && (
                             <p className="text-[11px] text-shade-40 mt-0.5">
-                              Scanned {new Date(c.jobs_scanned_at).toLocaleDateString()}
+                              Researched {new Date(c.researched_at).toLocaleDateString()} — no website found
                             </p>
                           )
                         )}
@@ -427,6 +601,17 @@ export default function CompaniesPage() {
                       <td className="py-3.5 text-shade-50 text-xs">{c.personalization_hook ?? "—"}</td>
                       <td className="py-3.5 text-xs capitalize">{c.status}</td>
                       <td className="py-3.5 text-right space-x-1 whitespace-nowrap">
+                        {!c.website && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-xs"
+                            disabled={researchingRow === c.id}
+                            onClick={() => handleResearchRow(c.id)}
+                          >
+                            {researchingRow === c.id ? "Researching..." : "Research"}
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="sm"
