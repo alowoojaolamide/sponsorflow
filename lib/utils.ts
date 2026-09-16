@@ -6,6 +6,22 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
+ * Prepends https:// to a URL a user typed without a scheme (e.g.
+ * "alowoojaolamide.webflow.io"). Without this, `new URL(...)` throws on the
+ * bare-domain form, which matters here specifically because the email
+ * click-tracking redirect (app/api/emails/track/click/[id]/route.ts)
+ * refuses to follow any URL it can't parse with a safe http(s) protocol —
+ * a scheme-less portfolio/LinkedIn URL silently bounced recipients to the
+ * app's homepage instead of the candidate's actual site.
+ */
+export function normalizeUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  const trimmed = url.trim();
+  if (!trimmed) return null;
+  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+}
+
+/**
  * Runs `worker` over `items` with at most `concurrency` in flight at once,
  * calling `onItemDone` as each one finishes (in completion order, not input
  * order) so callers can drive a live progress counter. Stops picking up new

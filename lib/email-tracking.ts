@@ -1,3 +1,5 @@
+import { normalizeUrl } from "@/lib/utils";
+
 function appUrl(): string {
   return process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 }
@@ -31,9 +33,16 @@ export function buildTrackedHtmlBody(
 ): string {
   let html = escapeHtml(plainBody).replace(/\n/g, "<br>\n");
 
+  // Defensive normalization here too (not just on save) — a bare-domain
+  // value already stored in the DB (e.g. "mysite.com" with no scheme) would
+  // otherwise fail the click-tracking redirect's safe-URL check and bounce
+  // the recipient to the app's homepage instead of the candidate's site.
+  const portfolioUrl = normalizeUrl(links.portfolioUrl);
+  const linkedinUrl = normalizeUrl(links.linkedinUrl);
+
   const replacements: [RegExp, string | null][] = [
-    [/\[Portfolio\]/gi, links.portfolioUrl ? `<a href="${trackedClickUrl(emailId, links.portfolioUrl)}">Portfolio</a>` : null],
-    [/\[LinkedIn\]/gi, links.linkedinUrl ? `<a href="${trackedClickUrl(emailId, links.linkedinUrl)}">LinkedIn</a>` : null],
+    [/\[Portfolio\]/gi, portfolioUrl ? `<a href="${trackedClickUrl(emailId, portfolioUrl)}">Portfolio</a>` : null],
+    [/\[LinkedIn\]/gi, linkedinUrl ? `<a href="${trackedClickUrl(emailId, linkedinUrl)}">LinkedIn</a>` : null],
     [/\[CV\]/gi, null], // no document storage/upload yet — drop rather than show a dead link
   ];
 

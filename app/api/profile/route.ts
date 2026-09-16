@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createSupabaseRouteClient } from "@/lib/supabase-server";
 import { requireUser } from "@/lib/auth";
 import { handleApiError } from "@/lib/api-helpers";
+import { normalizeUrl } from "@/lib/utils";
 import {
   ensureProfileRow,
   getFullProfile,
@@ -43,7 +44,14 @@ export async function PUT(req: Request) {
     const row = await ensureProfileRow(supabase, user.id);
 
     if (profile) {
-      await updateProfileFields(supabase, row.id, profile);
+      const normalizedProfile = { ...profile };
+      if ("portfolio_url" in normalizedProfile) {
+        normalizedProfile.portfolio_url = normalizeUrl(normalizedProfile.portfolio_url as string | null);
+      }
+      if ("linkedin_url" in normalizedProfile) {
+        normalizedProfile.linkedin_url = normalizeUrl(normalizedProfile.linkedin_url as string | null);
+      }
+      await updateProfileFields(supabase, row.id, normalizedProfile);
     }
     if (complete) {
       await updateProfileFields(supabase, row.id, { onboarding_complete: true });
