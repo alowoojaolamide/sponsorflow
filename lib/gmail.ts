@@ -104,7 +104,10 @@ export async function getGmailProfile(accessToken: string): Promise<{ emailAddre
   const res = await fetch("https://www.googleapis.com/gmail/v1/users/me/profile", {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
-  if (!res.ok) throw new Error("Failed to fetch Gmail profile");
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Failed to fetch Gmail profile (${res.status}): ${body.slice(0, 300)}`);
+  }
   return res.json();
 }
 
