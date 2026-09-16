@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createSupabaseRouteClient } from "@/lib/supabase-server";
 import { requireUser } from "@/lib/auth";
-import { getDashboardSummary } from "@/lib/analytics";
+import { getAiUsageState } from "@/lib/rate-limit";
 
 export async function GET() {
   const auth = await requireUser();
@@ -9,7 +9,7 @@ export async function GET() {
   const { user } = auth;
 
   const supabase = createSupabaseRouteClient();
-  const summary = await getDashboardSummary(supabase, user.id);
+  const state = await getAiUsageState(supabase, user.id);
 
-  return NextResponse.json(summary);
+  return NextResponse.json(state);
 }

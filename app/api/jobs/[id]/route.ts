@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
 import { createSupabaseRouteClient } from "@/lib/supabase-server";
-import { getCurrentUser } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
+import { handleApiError } from "@/lib/api-helpers";
 
 const VALID_STATUSES = ["new", "pitched", "applied", "dismissed"];
 
 export async function PUT(req: Request, { params }: { params: { id: string } }) {
-  const user = await getCurrentUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireUser();
+  if ("error" in auth) return auth.error;
+  const { user } = auth;
 
   try {
     const { status } = await req.json();
@@ -31,9 +31,6 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
 
     return NextResponse.json({ success: true, job: data });
   } catch (err: unknown) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Internal Server Error" },
-      { status: 500 }
-    );
+    return handleApiError(err);
   }
 }

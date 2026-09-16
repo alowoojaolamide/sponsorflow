@@ -1,14 +1,15 @@
 import { NextResponse } from "next/server";
 import { createSupabaseRouteClient } from "@/lib/supabase-server";
-import { getCurrentUser } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
 import { researchCompany, isResearchConfigured } from "@/lib/company-research";
+import { checkAndConsumeAiCall } from "@/lib/rate-limit";
 import type { TablesUpdate } from "@/types/database";
+import { handleApiError } from "@/lib/api-helpers";
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
-  const user = await getCurrentUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireUser();
+  if ("error" in auth) return auth.error;
+  const { user } = auth;
 
   if (!isResearchConfigured()) {
     return NextResponse.json(
@@ -28,6 +29,11 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
   if (companyError || !company) {
     return NextResponse.json({ error: "Company not found" }, { status: 404 });
+  }
+
+  const aiLimit = await checkAndConsumeAiCall(supabase, user.id);
+  if (!aiLimit.allowed) {
+    return NextResponse.json({ error: aiLimit.reason, code: "ai_cap_reached" }, { status: 429 });
   }
 
   try {
@@ -54,9 +60,6 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
     return NextResponse.json({ found: result.found, company: updated });
   } catch (err: unknown) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Internal Server Error" },
-      { status: 500 }
-    );
+    return handleApiError(err);
   }
 }

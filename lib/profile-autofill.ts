@@ -75,7 +75,11 @@ Extract and respond with ONLY valid JSON, no markdown fences, in this exact shap
   const raw = await callAI(prompt, 2000);
 
   try {
-    return parseAIJson<AutofillResult>(raw);
+    return parseAIJson<AutofillResult>(
+      raw,
+      (obj): obj is AutofillResult =>
+        !!obj && typeof obj === "object" && "profile" in obj && typeof (obj as { profile: unknown }).profile === "object"
+    );
   } catch {
     throw new Error("Could not parse the extracted profile. Try again or fill the form manually.");
   }

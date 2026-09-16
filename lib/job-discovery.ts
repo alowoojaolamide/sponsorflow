@@ -110,8 +110,9 @@ async function findAtsSlugFromCareerPage(url: string): Promise<{ source: "greenh
   }
 }
 
-async function extractJobsFromCareerPageWithAI(url: string): Promise<DiscoveredJob[]> {
+async function extractJobsFromCareerPageWithAI(url: string, aiGate?: () => Promise<boolean>): Promise<DiscoveredJob[]> {
   if (!isAIConfigured()) return [];
+  if (aiGate && !(await aiGate())) return [];
 
   const text = await extractTextFromUrl(url);
   if (!text) return [];
@@ -140,11 +141,22 @@ Respond with ONLY valid JSON, no markdown fences:
   }
 }
 
+/** Fetches from whichever ATS findAtsSlugFromCareerPage detected, filtered to relevant titles. */
+async function tryDetectedAts(
+  found: { source: "greenhouse" | "lever"; slug: string } | null,
+  extraKeywords: string[]
+): Promise<DiscoveredJob[] | null> {
+  if (!found) return null;
+  const jobs = found.source === "greenhouse" ? await tryGreenhouse(found.slug) : await tryLever(found.slug);
+  return jobs ? jobs.filter((j) => isRelevantTitle(j.title, extraKeywords)) : null;
+}
+
 export async function discoverJobsForCompany(
   companyName: string,
   website: string | null,
   careerPage: string | null,
-  extraKeywords: string[] = []
+  extraKeywords: string[] = [],
+  aiGate?: () => Promise<boolean>
 ): Promise<DiscoveredJob[]> {
   const candidates = slugCandidates(companyName, website);
 
@@ -157,14 +169,14 @@ export async function discoverJobsForCompany(
   }
 
   if (careerPage) {
-    const found = await findAtsSlugFromCareerPage(careerPage);
-    if (found) {
-      const jobs = found.source === "greenhouse" ? await tryGreenhouse(found.slug) : await tryLever(found.slug);
-      if (jobs) return jobs.filter((j) => isRelevantTitle(j.title, extraKeywords));
-    }
+    const found = await tryDetectedAts(await findAtsSlugFromCareerPage(careerPage), extraKeywords);
+    if (found) return found;
 
-    // Last resort: AI extraction directly from the page's visible text.
-    const aiJobs = await extractJobsFromCareerPageWithAI(careerPage);
+    // Last resort: AI extraction directly from the page's visible text —
+    // the only OpenAI-consuming step in job discovery, so it's the one
+    // gated by aiGate (a batch scan across thousands of companies otherwise
+    // has no ceiling on how many of these it can fire).
+    const aiJobs = await extractJobsFromCareerPageWithAI(careerPage, aiGate);
     return aiJobs.filter((j) => isRelevantTitle(j.title, extraKeywords));
   }
 
@@ -177,11 +189,8 @@ export async function discoverJobsForCompany(
   // any open roles to find.
   if (website) {
     const homepage = website.startsWith("http") ? website : `https://${website}`;
-    const found = await findAtsSlugFromCareerPage(homepage);
-    if (found) {
-      const jobs = found.source === "greenhouse" ? await tryGreenhouse(found.slug) : await tryLever(found.slug);
-      if (jobs) return jobs.filter((j) => isRelevantTitle(j.title, extraKeywords));
-    }
+    const found = await tryDetectedAts(await findAtsSlugFromCareerPage(homepage), extraKeywords);
+    if (found) return found;
   }
 
   return [];

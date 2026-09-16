@@ -1,5 +1,5 @@
 import { Document, Packer, Paragraph, HeadingLevel, TextRun } from "docx";
-import { getCurrentUser } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
 
 function section(title: string, prompts: string[]) {
   return [
@@ -13,10 +13,9 @@ function section(title: string, prompts: string[]) {
 }
 
 export async function GET() {
-  const user = await getCurrentUser();
-  if (!user) {
-    return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
-  }
+  const auth = await requireUser();
+  if ("error" in auth) return auth.error;
+  const { user } = auth;
 
   const doc = new Document({
     sections: [

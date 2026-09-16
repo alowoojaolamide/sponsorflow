@@ -9,12 +9,17 @@ type PubSubPushBody = {
   subscription: string;
 };
 
+/**
+ * Fails CLOSED: an unset/placeholder GMAIL_WEBHOOK_SECRET now rejects every
+ * request instead of accepting everything. This endpoint uses the
+ * RLS-bypassing service-role client (necessary since Google, not a
+ * signed-in user, calls it) — without a real secret there is nothing
+ * distinguishing a genuine Pub/Sub push from anyone who finds the URL.
+ */
 function verifyWebhookSecret(req: Request): boolean {
   const configured = process.env.GMAIL_WEBHOOK_SECRET;
   if (!configured || configured.includes("your-random-webhook-secret")) {
-    // No real secret configured — accept (dev-only fallback), matches how
-    // the other integrations here degrade gracefully rather than crash.
-    return true;
+    return false;
   }
   const url = new URL(req.url);
   return url.searchParams.get("token") === configured;
@@ -22,7 +27,10 @@ function verifyWebhookSecret(req: Request): boolean {
 
 export async function POST(req: Request) {
   if (!verifyWebhookSecret(req)) {
-    return NextResponse.json({ error: "Invalid webhook token" }, { status: 401 });
+    return NextResponse.json(
+      { error: "Invalid or missing webhook token. Set a real GMAIL_WEBHOOK_SECRET and configure the Pub/Sub push subscription to include ?token=<that value>." },
+      { status: 401 }
+    );
   }
 
   if (!hasServiceRoleKey) {
@@ -59,7 +67,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: true, skipped: "unknown_account" });
   }
 
-  const gmail = await getValidAccessToken(supabaseAdmin, connection.user_id);
+  let gmail: Awaited<ReturnType<typeof getValidAccessToken>>;
+  try {
+    gmail = await getValidAccessToken(supabaseAdmin, connection.user_id);
+  } catch {
+    // Refresh token was rejected (e.g. the user revoked Gmail access) —
+    // ack anyway rather than let Pub/Sub retry the same failure forever.
+    return NextResponse.json({ success: true, skipped: "token_refresh_failed" });
+  }
   if (!gmail) {
     return NextResponse.json({ success: true, skipped: "no_valid_token" });
   }
@@ -68,43 +83,65 @@ export async function POST(req: Request) {
   const { messages, newHistoryId } = await listHistorySince(gmail.accessToken, since);
 
   let processed = 0;
+  let failed = 0;
 
-  for (const msg of messages) {
-    const { data: outreachEmail } = await supabaseAdmin
+  if (messages.length > 0) {
+    // Batch both lookups upfront instead of one round trip per message.
+    const threadIds = Array.from(new Set(messages.map((m) => m.threadId)));
+    const { data: matchingEmails } = await supabaseAdmin
       .from("outreach_emails")
       .select("*")
-      .eq("gmail_thread_id", msg.threadId)
       .eq("user_id", connection.user_id)
-      .maybeSingle();
+      .in("gmail_thread_id", threadIds);
 
-    if (!outreachEmail) continue; // not a reply to one of our sent threads
+    const emailByThreadId = new Map((matchingEmails ?? []).map((e) => [e.gmail_thread_id, e]));
 
-    const detail = await getGmailMessage(gmail.accessToken, msg.id);
+    const outreachEmailIds = (matchingEmails ?? []).map((e) => e.id);
+    const { data: existingReplies } =
+      outreachEmailIds.length > 0
+        ? await supabaseAdmin
+            .from("email_replies")
+            .select("outreach_email_id, from_email, subject")
+            .in("outreach_email_id", outreachEmailIds)
+        : { data: [] };
 
-    const { data: alreadyLogged } = await supabaseAdmin
-      .from("email_replies")
-      .select("id")
-      .eq("outreach_email_id", outreachEmail.id)
-      .eq("from_email", detail.from)
-      .eq("subject", detail.subject)
-      .maybeSingle();
-    if (alreadyLogged) continue;
+    const loggedKeys = new Set(
+      (existingReplies ?? []).map((r) => `${r.outreach_email_id}::${r.from_email}::${r.subject}`)
+    );
 
-    const classification = await classifyReply(detail.body);
+    for (const msg of messages) {
+      const outreachEmail = emailByThreadId.get(msg.threadId);
+      if (!outreachEmail) continue; // not a reply to one of our sent threads
 
-    await supabaseAdmin.from("email_replies").insert({
-      user_id: connection.user_id,
-      outreach_email_id: outreachEmail.id,
-      from_email: detail.from,
-      subject: detail.subject,
-      body: detail.body,
-      ai_classification: classification.classification,
-      ai_confidence: classification.confidence,
-      ai_summary: classification.summary,
-    });
+      // One bad message (deleted since the history event, a transient Gmail
+      // API error, etc.) must not abort the rest of the batch or block
+      // history_id from advancing below — that would permanently stall
+      // reply ingestion for this mailbox on every retry.
+      try {
+        const detail = await getGmailMessage(gmail.accessToken, msg.id);
 
-    await supabaseAdmin.from("outreach_emails").update({ status: "replied" }).eq("id", outreachEmail.id);
-    processed++;
+        const key = `${outreachEmail.id}::${detail.from}::${detail.subject}`;
+        if (loggedKeys.has(key)) continue;
+
+        const classification = await classifyReply(detail.body);
+
+        await supabaseAdmin.from("email_replies").insert({
+          user_id: connection.user_id,
+          outreach_email_id: outreachEmail.id,
+          from_email: detail.from,
+          subject: detail.subject,
+          body: detail.body,
+          ai_classification: classification.classification,
+          ai_confidence: classification.confidence,
+          ai_summary: classification.summary,
+        });
+
+        await supabaseAdmin.from("outreach_emails").update({ status: "replied" }).eq("id", outreachEmail.id);
+        processed++;
+      } catch {
+        failed++;
+      }
+    }
   }
 
   await supabaseAdmin
@@ -112,5 +149,5 @@ export async function POST(req: Request) {
     .update({ history_id: newHistoryId })
     .eq("user_id", connection.user_id);
 
-  return NextResponse.json({ success: true, processed });
+  return NextResponse.json({ success: true, processed, failed });
 }

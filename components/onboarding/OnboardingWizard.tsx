@@ -45,6 +45,29 @@ type Project = {
   impact: string;
 };
 
+type RawProject = {
+  project_name: string;
+  company_name: string | null;
+  year: number | null;
+  description: string | null;
+  role: string | null;
+  industry: string | null;
+  impact: string | null;
+};
+
+/** Converts a project as returned by the API (nullable fields, numeric year) into the wizard's form-shaped Project (empty strings, string year). Shared by the initial profile-load fetch and the resume-autofill merge, which both receive this same shape. */
+function normalizeProject(p: RawProject): Project {
+  return {
+    project_name: p.project_name ?? "",
+    company_name: p.company_name ?? "",
+    year: p.year?.toString() ?? "",
+    description: p.description ?? "",
+    role: p.role ?? "",
+    industry: p.industry ?? "",
+    impact: p.impact ?? "",
+  };
+}
+
 type WizardState = {
   location: string;
   years_experience: string;
@@ -182,28 +205,7 @@ export function OnboardingWizard({ step }: { step: number }) {
               .filter((sk: { skill_category: string }) => sk.skill_category === "other")
               .map((sk: { skill_name: string }) => sk.skill_name)
               .join(", "),
-            projects:
-              data.projects.length > 0
-                ? data.projects.map(
-                    (proj: {
-                      project_name: string;
-                      company_name: string | null;
-                      year: number | null;
-                      description: string | null;
-                      role: string | null;
-                      industry: string | null;
-                      impact: string | null;
-                    }) => ({
-                      project_name: proj.project_name ?? "",
-                      company_name: proj.company_name ?? "",
-                      year: proj.year?.toString() ?? "",
-                      description: proj.description ?? "",
-                      role: proj.role ?? "",
-                      industry: proj.industry ?? "",
-                      impact: proj.impact ?? "",
-                    })
-                  )
-                : [{ ...emptyProject }],
+            projects: data.projects.length > 0 ? data.projects.map(normalizeProject) : [{ ...emptyProject }],
             requires_sponsorship: p.requires_sponsorship ?? true,
             target_salary_gbp: p.target_salary_gbp?.toString() ?? "",
             availability: p.availability ?? "",
@@ -262,18 +264,7 @@ export function OnboardingWizard({ step }: { step: number }) {
         design_skills: Array.from(new Set([...s.design_skills, ...extractedDesign])),
         tools: Array.from(new Set([...s.tools, ...extractedTools])),
         other_skills: [s.other_skills, leftover.join(", ")].filter(Boolean).join(", "),
-        projects:
-          result.projects.length > 0
-            ? result.projects.map((p) => ({
-                project_name: p.project_name ?? "",
-                company_name: p.company_name ?? "",
-                year: p.year?.toString() ?? "",
-                description: p.description ?? "",
-                role: p.role ?? "",
-                industry: p.industry ?? "",
-                impact: p.impact ?? "",
-              }))
-            : s.projects,
+        projects: result.projects.length > 0 ? result.projects.map(normalizeProject) : s.projects,
         fintech_experience: fintech?.experience_description ?? s.fintech_experience,
         fintech_problems: fintech?.problems_solved ?? s.fintech_problems,
         healthcare_experience: healthcare?.experience_description ?? s.healthcare_experience,
@@ -313,55 +304,45 @@ export function OnboardingWizard({ step }: { step: number }) {
   }
 
   function buildIndustryPayload() {
-    const base = state.industries.map((name) => ({
-      industry: name,
-      years_experience: state.industry_years[name] ? Number(state.industry_years[name]) : undefined,
-      experience_description: undefined as string | undefined,
-      problems_solved: undefined as string | undefined,
-      motivation: undefined as string | undefined,
-    }));
+    // Fintech and healthcare each get a dedicated onboarding step (7 & 8)
+    // capturing deeper positioning, independent of whether the industry was
+    // also ticked in step 3's background-industries list.
+    const specialPositioning: Record<string, { experience: string; problems: string; motivation: string }> = {
+      fintech: {
+        experience: state.fintech_experience,
+        problems: state.fintech_problems,
+        motivation: state.fintech_motivation,
+      },
+      healthcare: {
+        experience: state.healthcare_experience,
+        problems: state.healthcare_problems,
+        motivation: state.healthcare_motivation,
+      },
+    };
 
-    const withPositioning = base.map((i) => {
-      if (i.industry === "fintech") {
-        return {
-          ...i,
-          experience_description: state.fintech_experience || undefined,
-          problems_solved: state.fintech_problems || undefined,
-          motivation: state.fintech_motivation || undefined,
-        };
-      }
-      if (i.industry === "healthcare") {
-        return {
-          ...i,
-          experience_description: state.healthcare_experience || undefined,
-          problems_solved: state.healthcare_problems || undefined,
-          motivation: state.healthcare_motivation || undefined,
-        };
-      }
-      return i;
+    const base = state.industries.map((name) => {
+      const special = specialPositioning[name];
+      return {
+        industry: name,
+        years_experience: state.industry_years[name] ? Number(state.industry_years[name]) : undefined,
+        experience_description: special?.experience || undefined,
+        problems_solved: special?.problems || undefined,
+        motivation: special?.motivation || undefined,
+      };
     });
 
     // Ensure fintech/healthcare positioning is saved even if not selected as a background industry.
-    if (!state.industries.includes("fintech") && (state.fintech_experience || state.fintech_problems || state.fintech_motivation)) {
-      withPositioning.push({
-        industry: "fintech",
+    const extras = Object.entries(specialPositioning)
+      .filter(([name, p]) => !state.industries.includes(name) && (p.experience || p.problems || p.motivation))
+      .map(([name, p]) => ({
+        industry: name,
         years_experience: undefined,
-        experience_description: state.fintech_experience || undefined,
-        problems_solved: state.fintech_problems || undefined,
-        motivation: state.fintech_motivation || undefined,
-      });
-    }
-    if (!state.industries.includes("healthcare") && (state.healthcare_experience || state.healthcare_problems || state.healthcare_motivation)) {
-      withPositioning.push({
-        industry: "healthcare",
-        years_experience: undefined,
-        experience_description: state.healthcare_experience || undefined,
-        problems_solved: state.healthcare_problems || undefined,
-        motivation: state.healthcare_motivation || undefined,
-      });
-    }
+        experience_description: p.experience || undefined,
+        problems_solved: p.problems || undefined,
+        motivation: p.motivation || undefined,
+      }));
 
-    return withPositioning;
+    return [...base, ...extras];
   }
 
   async function save(isComplete = false) {
@@ -633,6 +614,10 @@ function StepContent({
   state: WizardState;
   set: <K extends keyof WizardState>(key: K, value: WizardState[K]) => void;
 }) {
+  function updateProject(idx: number, patch: Partial<Project>) {
+    set("projects", state.projects.map((p, i) => (i === idx ? { ...p, ...patch } : p)));
+  }
+
   switch (step) {
     case 1:
       return (
@@ -740,13 +725,13 @@ function StepContent({
                   </button>
                 )}
               </div>
-              <Input label="Project Name" value={proj.project_name} onChange={(e) => set("projects", state.projects.map((p, i) => (i === idx ? { ...p, project_name: e.target.value } : p)))} />
-              <Input label="Company" value={proj.company_name} onChange={(e) => set("projects", state.projects.map((p, i) => (i === idx ? { ...p, company_name: e.target.value } : p)))} />
-              <Input label="Year" type="number" value={proj.year} onChange={(e) => set("projects", state.projects.map((p, i) => (i === idx ? { ...p, year: e.target.value } : p)))} />
-              <Input label="Role" value={proj.role} onChange={(e) => set("projects", state.projects.map((p, i) => (i === idx ? { ...p, role: e.target.value } : p)))} />
-              <Input label="Industry" value={proj.industry} onChange={(e) => set("projects", state.projects.map((p, i) => (i === idx ? { ...p, industry: e.target.value } : p)))} />
-              <Input label="Description" value={proj.description} onChange={(e) => set("projects", state.projects.map((p, i) => (i === idx ? { ...p, description: e.target.value } : p)))} />
-              <Input label="Impact (with metrics)" value={proj.impact} onChange={(e) => set("projects", state.projects.map((p, i) => (i === idx ? { ...p, impact: e.target.value } : p)))} />
+              <Input label="Project Name" value={proj.project_name} onChange={(e) => updateProject(idx, { project_name: e.target.value })} />
+              <Input label="Company" value={proj.company_name} onChange={(e) => updateProject(idx, { company_name: e.target.value })} />
+              <Input label="Year" type="number" value={proj.year} onChange={(e) => updateProject(idx, { year: e.target.value })} />
+              <Input label="Role" value={proj.role} onChange={(e) => updateProject(idx, { role: e.target.value })} />
+              <Input label="Industry" value={proj.industry} onChange={(e) => updateProject(idx, { industry: e.target.value })} />
+              <Input label="Description" value={proj.description} onChange={(e) => updateProject(idx, { description: e.target.value })} />
+              <Input label="Impact (with metrics)" value={proj.impact} onChange={(e) => updateProject(idx, { impact: e.target.value })} />
             </div>
           ))}
           <Button type="button" variant="outline-light" size="sm" onClick={() => set("projects", [...state.projects, { ...emptyProject }])}>

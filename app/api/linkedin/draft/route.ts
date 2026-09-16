@@ -1,14 +1,15 @@
 import { NextResponse } from "next/server";
 import { createSupabaseRouteClient } from "@/lib/supabase-server";
-import { getCurrentUser } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
 import { getFullProfile } from "@/lib/db";
 import { generateLinkedInMessage, isAIConfigured } from "@/lib/ai-linkedin";
+import { checkAndConsumeAiCall } from "@/lib/rate-limit";
+import { handleApiError } from "@/lib/api-helpers";
 
 export async function POST(req: Request) {
-  const user = await getCurrentUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireUser();
+  if ("error" in auth) return auth.error;
+  const { user } = auth;
 
   if (!isAIConfigured()) {
     return NextResponse.json(
@@ -44,6 +45,11 @@ export async function POST(req: Request) {
       );
     }
 
+    const aiLimit = await checkAndConsumeAiCall(supabase, user.id);
+    if (!aiLimit.allowed) {
+      return NextResponse.json({ error: aiLimit.reason, code: "ai_cap_reached" }, { status: 429 });
+    }
+
     const job = job_title ? { title: job_title, url: job_url ?? null, description: job_description ?? null } : null;
     const draft = await generateLinkedInMessage(full.profile, full.industries, full.projects, company, job);
 
@@ -53,9 +59,6 @@ export async function POST(req: Request) {
       ...draft,
     });
   } catch (err: unknown) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Internal Server Error" },
-      { status: 500 }
-    );
+    return handleApiError(err);
   }
 }

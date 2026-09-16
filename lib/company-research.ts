@@ -1,13 +1,7 @@
 import OpenAI from "openai";
+import { getOpenAIClient, mapOpenAIError, isAIConfigured } from "@/lib/ai-client";
 
-function realKey(): string | null {
-  const key = process.env.OPENAI_API_KEY;
-  return key && key !== "your-openai-api-key" ? key : null;
-}
-
-export function isResearchConfigured(): boolean {
-  return !!realKey();
-}
+export { isAIConfigured as isResearchConfigured };
 
 export type CompanyResearchResult = {
   website: string | null;
@@ -35,10 +29,7 @@ export async function researchCompany(
   companyName: string,
   industryHint: string | null = null
 ): Promise<CompanyResearchResult> {
-  const key = realKey();
-  if (!key) throw new Error("OPENAI_API_KEY is not configured.");
-
-  const client = new OpenAI({ apiKey: key });
+  const client = getOpenAIClient();
 
   try {
     const response = await client.responses.create({
@@ -58,15 +49,7 @@ export async function researchCompany(
     };
   } catch (err) {
     if (err instanceof OpenAI.APIError) {
-      if (err.status === 401) throw new Error("OpenAI API key was rejected. Check OPENAI_API_KEY.");
-      if (err.status === 429) {
-        throw new Error(
-          /quota/i.test(err.message)
-            ? "Your OpenAI account has no credit balance for web search requests."
-            : "OpenAI rate limit hit. Try again shortly."
-        );
-      }
-      throw new Error(`OpenAI research request failed (${err.status}).`);
+      throw mapOpenAIError(err);
     }
     // A response that isn't valid JSON (e.g. the model explained instead of
     // answering) shouldn't crash a batch run — treat it as "not found".

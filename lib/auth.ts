@@ -1,4 +1,6 @@
+import { NextResponse } from "next/server";
 import { createSupabaseRouteClient } from "./supabase-server";
+import type { User } from "@supabase/supabase-js";
 
 type SupabaseRouteClient = ReturnType<typeof createSupabaseRouteClient>;
 
@@ -86,4 +88,20 @@ export async function getCurrentUser() {
 export async function isAuthenticated(): Promise<boolean> {
   const user = await getCurrentUser();
   return !!user;
+}
+
+/**
+ * The `const user = await getCurrentUser(); if (!user) return 401` guard
+ * repeated at the top of every authenticated API route, collapsed to one
+ * call. Usage:
+ *   const auth = await requireUser();
+ *   if ("error" in auth) return auth.error;
+ *   const { user } = auth;
+ */
+export async function requireUser(): Promise<{ user: User } | { error: NextResponse }> {
+  const user = await getCurrentUser();
+  if (!user) {
+    return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
+  }
+  return { user };
 }

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { exchangeOAuthCode } from "@/lib/auth";
+import { handleApiError } from "@/lib/api-helpers";
 
 export async function POST(req: Request) {
   try {
@@ -21,9 +22,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ success: true, user_id: user.id });
   } catch (err: unknown) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Internal Server Error" },
-      { status: 500 }
-    );
+    return handleApiError(err);
   }
 }

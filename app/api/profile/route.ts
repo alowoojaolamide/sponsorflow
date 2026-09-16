@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createSupabaseRouteClient } from "@/lib/supabase-server";
-import { getCurrentUser } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
+import { handleApiError } from "@/lib/api-helpers";
 import {
   ensureProfileRow,
   getFullProfile,
@@ -12,10 +13,9 @@ import {
 } from "@/lib/db";
 
 export async function GET() {
-  const user = await getCurrentUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireUser();
+  if ("error" in auth) return auth.error;
+  const { user } = auth;
 
   const supabase = createSupabaseRouteClient();
   await ensureProfileRow(supabase, user.id);
@@ -25,10 +25,9 @@ export async function GET() {
 }
 
 export async function PUT(req: Request) {
-  const user = await getCurrentUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireUser();
+  if ("error" in auth) return auth.error;
+  const { user } = auth;
 
   try {
     const body = await req.json();
@@ -87,9 +86,6 @@ export async function PUT(req: Request) {
 
     return NextResponse.json({ success: true, profile_complete_percent: percent });
   } catch (err: unknown) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Internal Server Error" },
-      { status: 500 }
-    );
+    return handleApiError(err);
   }
 }

@@ -1,27 +1,22 @@
 import { NextResponse } from "next/server";
 import { createSupabaseRouteClient } from "@/lib/supabase-server";
-import { getCurrentUser } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
+import { getJobPostings } from "@/lib/db";
 
 export async function GET(req: Request) {
-  const user = await getCurrentUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireUser();
+  if ("error" in auth) return auth.error;
+  const { user } = auth;
 
   const supabase = createSupabaseRouteClient();
   const { searchParams } = new URL(req.url);
-  const companyId = searchParams.get("company_id");
-  const status = searchParams.get("status");
+  const companyId = searchParams.get("company_id") || undefined;
+  const status = searchParams.get("status") || undefined;
+  const limitParam = searchParams.get("limit");
+  const limit = limitParam ? Number(limitParam) : undefined;
+  const offset = Number(searchParams.get("offset")) || undefined;
 
-  let query = supabase.from("job_postings").select("*").eq("user_id", user.id);
-  if (companyId) query = query.eq("company_id", companyId);
-  if (status) query = query.eq("status", status);
+  const { jobs, total } = await getJobPostings(supabase, user.id, { companyId, status, limit, offset });
 
-  const { data, error } = await query.order("discovered_at", { ascending: false });
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
-  }
-
-  return NextResponse.json({ jobs: data ?? [] });
+  return NextResponse.json({ jobs, total });
 }

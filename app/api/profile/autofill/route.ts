@@ -1,13 +1,15 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
+import { createSupabaseRouteClient } from "@/lib/supabase-server";
 import { extractTextFromFile, extractTextFromUrl } from "@/lib/document-extract";
 import { autofillProfileFromDocuments, isAutofillConfigured } from "@/lib/profile-autofill";
+import { checkAndConsumeAiCall } from "@/lib/rate-limit";
+import { handleApiError } from "@/lib/api-helpers";
 
 export async function POST(req: Request) {
-  const user = await getCurrentUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireUser();
+  if ("error" in auth) return auth.error;
+  const { user } = auth;
 
   if (!isAutofillConfigured()) {
     return NextResponse.json(
@@ -41,16 +43,22 @@ export async function POST(req: Request) {
       );
     }
 
+    const supabase = createSupabaseRouteClient();
+    const aiLimit = await checkAndConsumeAiCall(supabase, user.id);
+    if (!aiLimit.allowed) {
+      return NextResponse.json({ error: aiLimit.reason, code: "ai_cap_reached" }, { status: 429 });
+    }
+
     const result = await autofillProfileFromDocuments(resumeText, portfolioText, linkedinText);
+    if (!result.profile) {
+      throw new Error("Could not parse the extracted profile. Try again or fill the form manually.");
+    }
     if (portfolioUrl && !result.profile.portfolio_url) {
       result.profile.portfolio_url = portfolioUrl;
     }
 
     return NextResponse.json(result);
   } catch (err: unknown) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Internal Server Error" },
-      { status: 500 }
-    );
+    return handleApiError(err);
   }
 }

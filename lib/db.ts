@@ -51,6 +51,19 @@ export async function ensureProfileRow(supabase: DB, userId: string) {
     .select("*")
     .single();
 
+  // 23505 = unique_violation — a concurrent request (e.g. two tabs loading
+  // the profile page at once) already created the row; re-fetch it instead
+  // of surfacing an error.
+  if (error?.code === "23505") {
+    const { data: existing, error: refetchError } = await supabase
+      .from("user_profiles")
+      .select("*")
+      .eq("user_id", userId)
+      .single();
+    if (refetchError) throw refetchError;
+    return existing;
+  }
+
   if (error) throw error;
   return created;
 }
@@ -113,11 +126,11 @@ export function computeCompletionPercent(full: FullProfile): number {
 
   const checks = [
     true, // step 1: welcome (row exists)
-    !!(p.location && p.years_experience && p.target_job_title), // step 2
+    !!(p.location && p.years_experience != null && p.target_job_title), // step 2
     full.industries.length > 0, // step 3
     full.skills.filter((s) => s.skill_category === "design").length >= 3, // step 4
     full.projects.length > 0, // step 5
-    !!(p.target_salary_gbp && p.availability), // step 6
+    !!(p.target_salary_gbp != null && p.availability), // step 6
     full.industries.some((i) => i.industry === "fintech" && i.experience_description), // step 7
     full.industries.some((i) => i.industry === "healthcare" && i.experience_description), // step 8
     !!p.professional_summary, // step 9
@@ -243,14 +256,39 @@ export async function getCompanies(
 
 export async function getOutreachEmails(
   supabase: DB,
-  userId: string
+  userId: string,
+  options: { status?: string; limit?: number; offset?: number } = {}
 ): Promise<Tables<"outreach_emails">[]> {
-  const { data, error } = await supabase
-    .from("outreach_emails")
-    .select("*")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false });
+  let query = supabase.from("outreach_emails").select("*").eq("user_id", userId);
+  if (options.status) query = query.eq("status", options.status);
 
+  query = query.order("created_at", { ascending: false });
+  if (options.limit != null) {
+    const offset = options.offset ?? 0;
+    query = query.range(offset, offset + options.limit - 1);
+  }
+
+  const { data, error } = await query;
   if (error) return [];
   return data || [];
+}
+
+export async function getJobPostings(
+  supabase: DB,
+  userId: string,
+  options: { companyId?: string; status?: string; limit?: number; offset?: number } = {}
+): Promise<{ jobs: Tables<"job_postings">[]; total: number }> {
+  let query = supabase.from("job_postings").select("*", { count: "exact" }).eq("user_id", userId);
+  if (options.companyId) query = query.eq("company_id", options.companyId);
+  if (options.status) query = query.eq("status", options.status);
+
+  query = query.order("discovered_at", { ascending: false });
+  if (options.limit != null) {
+    const offset = options.offset ?? 0;
+    query = query.range(offset, offset + options.limit - 1);
+  }
+
+  const { data, error, count } = await query;
+  if (error) return { jobs: [], total: 0 };
+  return { jobs: data || [], total: count ?? 0 };
 }

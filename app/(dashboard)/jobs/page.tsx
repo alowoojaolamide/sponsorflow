@@ -73,9 +73,15 @@ export default function JobsPage() {
       }),
     });
     const draftData = await draftRes.json();
-    if (!draftRes.ok) throw new Error(draftData.error || "Failed to generate draft");
+    if (!draftRes.ok) {
+      const err = new Error(draftData.error || "Failed to generate draft") as Error & { code?: string };
+      err.code = draftData.code;
+      throw err;
+    }
     if (!draftData.to_email) {
-      throw new Error("NO_RECIPIENT_EMAIL");
+      const err = new Error("No recipient email on file") as Error & { code?: string };
+      err.code = "no_recipient_email";
+      throw err;
     }
 
     const saveRes = await fetch("/api/emails", {
@@ -122,7 +128,12 @@ export default function JobsPage() {
         (job) => draftOne(job),
         (job, _index, _result, error) => {
           setBatchDone((d) => d + 1);
-          if (error instanceof Error && error.message === "NO_RECIPIENT_EMAIL") {
+          const code = error instanceof Error ? (error as Error & { code?: string }).code : undefined;
+          if (code === "ai_cap_reached") {
+            batchCancelRef.current = true;
+            setBatchLastError(error instanceof Error ? error.message : "AI usage cap reached.");
+            setBatchErrors((e) => e + 1);
+          } else if (code === "no_recipient_email") {
             setBatchSkippedNoEmail((n) => n + 1);
           } else if (error) {
             setBatchErrors((e) => e + 1);

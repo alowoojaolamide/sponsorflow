@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { Database } from "@/types/database";
 import { getValidAccessToken, sendGmailMessage } from "@/lib/gmail";
-import { checkAndConsumeSendLimit } from "@/lib/rate-limit";
+import { checkAndConsumeSendLimit, releaseSendLimit } from "@/lib/rate-limit";
 import { buildTrackedHtmlBody } from "@/lib/email-tracking";
 
 type DB = SupabaseClient<Database>;
@@ -73,6 +73,11 @@ export async function sendOutreachEmail(supabase: DB, userId: string, emailId: s
     return { ok: true, emailId, gmailMessageId: sent.id };
   } catch (err: unknown) {
     await supabase.from("outreach_emails").update({ delivery_status: "failed" }).eq("id", emailId);
+    // The send-limit slot was reserved before the (failed) send attempt —
+    // Gmail's send call is atomic (it either returns a sent message or
+    // throws with nothing sent), so it's safe to give the slot back rather
+    // than let a transient failure permanently cost the user real capacity.
+    await releaseSendLimit(supabase, userId).catch(() => {});
     return { ok: false, emailId, error: err instanceof Error ? err.message : "Send failed" };
   }
 }

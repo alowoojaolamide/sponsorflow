@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { Database, Tables } from "@/types/database";
+import { Database } from "@/types/database";
 
 type DB = SupabaseClient<Database>;
 
@@ -10,89 +10,92 @@ export type RateLimitState = {
   hourly_used: number;
 };
 
-function currentHour(): number {
-  return new Date().getUTCHours();
-}
-
-function currentDate(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
-async function ensureSendLimitRow(supabase: DB, userId: string): Promise<Tables<"send_limits">> {
-  const { data } = await supabase.from("send_limits").select("*").eq("user_id", userId).maybeSingle();
-  if (data) return data;
-
-  const { data: created, error } = await supabase
-    .from("send_limits")
-    .insert({ user_id: userId })
-    .select("*")
-    .single();
-  if (error) throw error;
-  return created;
-}
-
-/** Resets daily/hourly counters if the clock has rolled over since the last reset. */
-async function resetIfNeeded(supabase: DB, row: Tables<"send_limits">): Promise<Tables<"send_limits">> {
-  const today = currentDate();
-  const hour = currentHour();
-
-  const needsDailyReset = row.last_reset_date !== today;
-  const needsHourlyReset = needsDailyReset || row.last_reset_hour !== hour;
-
-  if (!needsDailyReset && !needsHourlyReset) return row;
-
-  const { data, error } = await supabase
-    .from("send_limits")
-    .update({
-      emails_sent_today: needsDailyReset ? 0 : row.emails_sent_today,
-      emails_sent_this_hour: needsHourlyReset ? 0 : row.emails_sent_this_hour,
-      last_reset_date: today,
-      last_reset_hour: hour,
-    })
-    .eq("id", row.id)
-    .select("*")
-    .single();
-
-  if (error) throw error;
-  return data;
-}
-
+/** Read-only state, safe to poll for display (does not consume a slot). */
 export async function getRateLimitState(supabase: DB, userId: string): Promise<RateLimitState> {
-  const row = await resetIfNeeded(supabase, await ensureSendLimitRow(supabase, userId));
+  const { data } = await supabase.from("send_limits").select("*").eq("user_id", userId).maybeSingle();
+  if (!data) {
+    return { daily_limit: 20, daily_used: 0, hourly_limit: 5, hourly_used: 0 };
+  }
+  const today = new Date().toISOString().slice(0, 10);
+  const hour = new Date().getUTCHours();
+  const staleDay = data.last_reset_date !== today;
+  const staleHour = staleDay || data.last_reset_hour !== hour;
   return {
-    daily_limit: row.daily_limit,
-    daily_used: row.emails_sent_today,
-    hourly_limit: row.hourly_limit,
-    hourly_used: row.emails_sent_this_hour,
+    daily_limit: data.daily_limit,
+    daily_used: staleDay ? 0 : data.emails_sent_today,
+    hourly_limit: data.hourly_limit,
+    hourly_used: staleHour ? 0 : data.emails_sent_this_hour,
   };
 }
 
 /**
  * Atomically checks the user's send limits and, if allowed, increments both
- * counters. Returns { allowed: false, reason } without incrementing when a
+ * counters — via a single guarded UPDATE in the consume_send_limit Postgres
+ * function (supabase/migrations/20260915000003_atomic_rate_limits.sql), so
+ * concurrent requests can't both read the same pre-increment count and both
+ * pass. Returns { allowed: false, reason } without incrementing when a
  * limit is hit.
  */
 export async function checkAndConsumeSendLimit(
   supabase: DB,
   userId: string
 ): Promise<{ allowed: true } | { allowed: false; reason: string }> {
-  const row = await resetIfNeeded(supabase, await ensureSendLimitRow(supabase, userId));
-
-  if (row.emails_sent_today >= row.daily_limit) {
-    return { allowed: false, reason: `Daily limit reached (${row.daily_limit}/day). Try again tomorrow.` };
-  }
-  if (row.emails_sent_this_hour >= row.hourly_limit) {
-    return { allowed: false, reason: `Hourly limit reached (${row.hourly_limit}/hour). Slow down and try again shortly.` };
-  }
-
-  const { error } = await supabase
-    .from("send_limits")
-    .update({
-      emails_sent_today: row.emails_sent_today + 1,
-      emails_sent_this_hour: row.emails_sent_this_hour + 1,
-    })
-    .eq("id", row.id);
-
+  const { data, error } = await supabase.rpc("consume_send_limit", { p_user_id: userId });
   if (error) throw error;
+  const row = data?.[0];
+  if (!row) throw new Error("consume_send_limit returned no row");
+  if (!row.allowed) return { allowed: false, reason: row.reason ?? "Send limit reached." };
+  return { allowed: true };
+}
+
+/** Gives back a reserved send-limit slot after a send that turned out to fail. */
+export async function releaseSendLimit(supabase: DB, userId: string): Promise<void> {
+  const { error } = await supabase.rpc("release_send_limit", { p_user_id: userId });
+  if (error) throw error;
+}
+
+export type AiUsageState = {
+  daily_limit: number;
+  daily_used: number;
+  hourly_limit: number;
+  hourly_used: number;
+};
+
+/** Read-only AI usage state, safe to poll for display. */
+export async function getAiUsageState(supabase: DB, userId: string): Promise<AiUsageState> {
+  const { data } = await supabase.from("ai_usage_limits").select("*").eq("user_id", userId).maybeSingle();
+  if (!data) {
+    return { daily_limit: 200, daily_used: 0, hourly_limit: 50, hourly_used: 0 };
+  }
+  const today = new Date().toISOString().slice(0, 10);
+  const hour = new Date().getUTCHours();
+  const staleDay = data.last_reset_date !== today;
+  const staleHour = staleDay || data.last_reset_hour !== hour;
+  return {
+    daily_limit: data.daily_limit,
+    daily_used: staleDay ? 0 : data.calls_today,
+    hourly_limit: data.hourly_limit,
+    hourly_used: staleHour ? 0 : data.calls_this_hour,
+  };
+}
+
+/**
+ * Atomically checks and consumes one unit of the user's OpenAI-call budget
+ * (company research, the AI career-page-extraction fallback in job
+ * discovery, email/LinkedIn draft generation). Every route that calls
+ * OpenAI on a per-item basis from a batch action MUST call this first and
+ * bail out on `allowed: false` — this is what caps a runaway "Research
+ * Companies" / "Discover Jobs for All" / "Draft Emails for All" batch loop
+ * from burning through a real OpenAI budget in one sitting.
+ */
+export async function checkAndConsumeAiCall(
+  supabase: DB,
+  userId: string
+): Promise<{ allowed: true } | { allowed: false; reason: string }> {
+  const { data, error } = await supabase.rpc("consume_ai_call", { p_user_id: userId });
+  if (error) throw error;
+  const row = data?.[0];
+  if (!row) throw new Error("consume_ai_call returned no row");
+  if (!row.allowed) return { allowed: false, reason: row.reason ?? "AI usage cap reached." };
   return { allowed: true };
 }

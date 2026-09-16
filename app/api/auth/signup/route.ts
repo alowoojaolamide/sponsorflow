@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { signupUser } from "@/lib/auth";
+import { handleApiError } from "@/lib/api-helpers";
 
 export async function POST(req: Request) {
   try {
@@ -34,9 +35,6 @@ export async function POST(req: Request) {
       email_confirmation_required: !session,
     });
   } catch (err: unknown) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Internal Server Error" },
-      { status: 500 }
-    );
+    return handleApiError(err);
   }
 }

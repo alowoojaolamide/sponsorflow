@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import { createSupabaseRouteClient } from "@/lib/supabase-server";
-import { getCurrentUser } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
 import { discoverJobsForCompany } from "@/lib/job-discovery";
+import { checkAndConsumeAiCall } from "@/lib/rate-limit";
+import { handleApiError } from "@/lib/api-helpers";
 
 export async function POST(req: Request) {
-  const user = await getCurrentUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireUser();
+  if ("error" in auth) return auth.error;
+  const { user } = auth;
 
   try {
     const { company_id } = await req.json();
@@ -36,11 +37,19 @@ export async function POST(req: Request) {
 
     const extraKeywords = profile?.target_job_title ? [profile.target_job_title] : [];
 
+    // Only the AI career-page-extraction fallback inside discoverJobsForCompany
+    // spends OpenAI budget — the Greenhouse/Lever slug guessing is free. Gate
+    // just that step so a "no explicit career page" result never blocks the
+    // free part of discovery, while still capping how many AI calls a batch
+    // scan across thousands of companies can fire.
+    const aiGate = async () => (await checkAndConsumeAiCall(supabase, user.id)).allowed;
+
     const jobs = await discoverJobsForCompany(
       company.company_name,
       company.website,
       company.career_page,
-      extraKeywords
+      extraKeywords,
+      aiGate
     );
 
     // Mark scanned regardless of outcome so a batch re-run can skip this
@@ -75,9 +84,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ found: saved?.length ?? 0, jobs: saved ?? [] });
   } catch (err: unknown) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Internal Server Error" },
-      { status: 500 }
-    );
+    return handleApiError(err);
   }
 }

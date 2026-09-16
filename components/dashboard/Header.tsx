@@ -7,11 +7,16 @@ import { ThemeToggle } from "@/components/ui/ThemeToggle";
 
 export function Header() {
   const [limit, setLimit] = useState<{ daily_used: number; daily_limit: number } | null>(null);
+  const [aiUsage, setAiUsage] = useState<{ daily_used: number; daily_limit: number } | null>(null);
 
   useEffect(() => {
     fetch("/api/emails/rate-limit")
       .then((res) => (res.ok ? res.json() : null))
       .then(setLimit)
+      .catch(() => {});
+    fetch("/api/ai-usage")
+      .then((res) => (res.ok ? res.json() : null))
+      .then(setAiUsage)
       .catch(() => {});
   }, []);
 
@@ -29,8 +34,18 @@ export function Header() {
       </div>
 
       <div className="flex items-center gap-3">
-        <div className="hidden md:flex items-center text-xs text-shade-50 font-medium mr-2">
-          Daily limit: <span className="text-ink font-semibold ml-1">{limit ? `${limit.daily_used}/${limit.daily_limit}` : "—"} sent</span>
+        <div className="hidden lg:flex items-center text-xs text-shade-50 font-medium mr-2 gap-3">
+          <span>
+            Daily limit:{" "}
+            <span className="text-ink font-semibold">{limit ? `${limit.daily_used}/${limit.daily_limit}` : "—"} sent</span>
+          </span>
+          <span className="text-hairline-light">|</span>
+          <span title="Company research, job discovery's AI fallback, and email/LinkedIn drafting all count against this.">
+            AI usage:{" "}
+            <span className="text-ink font-semibold">
+              {aiUsage ? `${aiUsage.daily_used}/${aiUsage.daily_limit}` : "—"}
+            </span>
+          </span>
         </div>
         <ThemeToggle />
         <Link href="/profile">

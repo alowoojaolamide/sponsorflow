@@ -70,6 +70,7 @@ export default function CompaniesPage() {
   const [researchErrors, setResearchErrors] = useState(0);
   const [reresearchAll, setReresearchAll] = useState(false);
   const [unresearchedCount, setUnresearchedCount] = useState<number | null>(null);
+  const [researchStoppedReason, setResearchStoppedReason] = useState<string | null>(null);
   const researchCancelRef = React.useRef(false);
 
   const [searchInput, setSearchInput] = useState("");
@@ -243,7 +244,11 @@ export default function CompaniesPage() {
   async function handleResearchOne(companyId: string) {
     const res = await fetch(`/api/companies/${companyId}/research`, { method: "POST" });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Research failed");
+    if (!res.ok) {
+      const err = new Error(data.error || "Research failed") as Error & { code?: string };
+      err.code = data.code;
+      throw err;
+    }
     if (data.company) {
       setCompanies((cs) => cs.map((c) => (c.id === companyId ? { ...c, ...data.company } : c)));
     }
@@ -274,6 +279,7 @@ export default function CompaniesPage() {
     setResearchFoundCount(0);
     setResearchErrors(0);
     setResearchTotal(0);
+    setResearchStoppedReason(null);
 
     try {
       const extraParams: Record<string, string> = { has_website: "false" };
@@ -288,7 +294,11 @@ export default function CompaniesPage() {
         (company) => handleResearchOne(company.id),
         (_company, _index, result, error) => {
           setResearchDone((d) => d + 1);
-          if (error) {
+          const code = error instanceof Error ? (error as Error & { code?: string }).code : undefined;
+          if (code === "ai_cap_reached") {
+            researchCancelRef.current = true;
+            setResearchStoppedReason(error instanceof Error ? error.message : "AI usage cap reached.");
+          } else if (error) {
             setResearchErrors((e) => e + 1);
           } else if (result?.found) {
             setResearchFoundCount((n) => n + 1);
@@ -395,6 +405,8 @@ export default function CompaniesPage() {
                   ? researchFetchingTargets
                     ? "Finding companies to research..."
                     : `Researching companies via AI web search... (${researchDone}/${researchTotal})`
+                  : researchStoppedReason
+                  ? `Stopped — ${researchDone}/${researchTotal} checked. AI usage cap reached.`
                   : researchDone < researchTotal
                   ? `Stopped — ${researchDone}/${researchTotal} checked. Click "Research Companies" again to resume.`
                   : `Research complete — ${researchDone}/${researchTotal} companies checked`}
@@ -429,6 +441,9 @@ export default function CompaniesPage() {
               {researchFoundCount} website{researchFoundCount === 1 ? "" : "s"} found
               {researchErrors > 0 && ` · ${researchErrors} lookup${researchErrors === 1 ? "" : "s"} failed`}
             </p>
+            {researchStoppedReason && (
+              <p className="text-xs text-amber-600 dark:text-amber-400">{researchStoppedReason}</p>
+            )}
           </CardContent>
         </Card>
       )}

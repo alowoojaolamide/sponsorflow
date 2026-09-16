@@ -1,15 +1,14 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
-import { supabaseAdmin } from "@/lib/supabase-server";
+import { requireUser } from "@/lib/auth";
+import { createSupabaseRouteClient } from "@/lib/supabase-server";
 
 export async function GET() {
-  const user = await getCurrentUser();
+  const auth = await requireUser();
+  if ("error" in auth) return auth.error;
+  const { user } = auth;
 
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const { data: profile } = await supabaseAdmin
+  const supabase = createSupabaseRouteClient();
+  const { data: profile } = await supabase
     .from("user_profiles")
     .select("onboarding_complete, profile_complete_percent")
     .eq("user_id", user.id)

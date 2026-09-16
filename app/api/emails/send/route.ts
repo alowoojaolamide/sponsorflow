@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { createSupabaseRouteClient } from "@/lib/supabase-server";
-import { getCurrentUser } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
 import { sendOutreachEmail } from "@/lib/send-email";
+import { handleApiError } from "@/lib/api-helpers";
 
 export async function POST(req: Request) {
-  const user = await getCurrentUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireUser();
+  if ("error" in auth) return auth.error;
+  const { user } = auth;
 
   try {
     const { outreach_email_id } = await req.json();
@@ -24,9 +24,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ success: true, sent_at: new Date().toISOString(), tracking_id: result.gmailMessageId });
   } catch (err: unknown) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Internal Server Error" },
-      { status: 500 }
-    );
+    return handleApiError(err);
   }
 }

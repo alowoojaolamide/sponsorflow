@@ -748,6 +748,53 @@ export type Database = {
           }
         ];
       };
+      ai_usage_limits: {
+        Row: {
+          id: string;
+          user_id: string;
+          daily_limit: number;
+          hourly_limit: number;
+          calls_today: number;
+          calls_this_hour: number;
+          last_reset_date: string;
+          last_reset_hour: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          daily_limit?: number;
+          hourly_limit?: number;
+          calls_today?: number;
+          calls_this_hour?: number;
+          last_reset_date?: string;
+          last_reset_hour?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          daily_limit?: number;
+          hourly_limit?: number;
+          calls_today?: number;
+          calls_this_hour?: number;
+          last_reset_date?: string;
+          last_reset_hour?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "ai_usage_limits_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: true;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
       analytics_daily: {
         Row: {
           id: string;
@@ -990,6 +1037,32 @@ export type Database = {
       record_email_click: {
         Args: { p_email_id: string; p_link?: string | null };
         Returns: undefined;
+      };
+      consume_send_limit: {
+        Args: { p_user_id: string };
+        Returns: {
+          allowed: boolean;
+          reason: string | null;
+          daily_used: number;
+          daily_limit: number;
+          hourly_used: number;
+          hourly_limit: number;
+        }[];
+      };
+      release_send_limit: {
+        Args: { p_user_id: string };
+        Returns: undefined;
+      };
+      consume_ai_call: {
+        Args: { p_user_id: string };
+        Returns: {
+          allowed: boolean;
+          reason: string | null;
+          daily_used: number;
+          daily_limit: number;
+          hourly_used: number;
+          hourly_limit: number;
+        }[];
       };
     };
   };

@@ -1,33 +1,34 @@
 import { NextResponse } from "next/server";
 import { createSupabaseRouteClient } from "@/lib/supabase-server";
-import { getCurrentUser } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
 import { getOutreachEmails } from "@/lib/db";
+import { handleApiError } from "@/lib/api-helpers";
 
 export async function GET(req: Request) {
-  const user = await getCurrentUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireUser();
+  if ("error" in auth) return auth.error;
+  const { user } = auth;
 
   const supabase = createSupabaseRouteClient();
   const { searchParams } = new URL(req.url);
-  const status = searchParams.get("status");
+  const status = searchParams.get("status") || undefined;
 
-  let emails = await getOutreachEmails(supabase, user.id);
-  if (status) {
-    emails = emails.filter((e) => e.status === status);
-  }
+  const [emails, { count: pendingCount }] = await Promise.all([
+    getOutreachEmails(supabase, user.id, { status }),
+    supabase
+      .from("outreach_emails")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .eq("status", "draft"),
+  ]);
 
-  const pendingCount = emails.filter((e) => e.status === "draft").length;
-
-  return NextResponse.json({ emails, pendingCount });
+  return NextResponse.json({ emails, pendingCount: pendingCount ?? 0 });
 }
 
 export async function POST(req: Request) {
-  const user = await getCurrentUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await requireUser();
+  if ("error" in auth) return auth.error;
+  const { user } = auth;
 
   try {
     const body = await req.json();
@@ -52,6 +53,31 @@ export async function POST(req: Request) {
     }
 
     const supabase = createSupabaseRouteClient();
+
+    // Every other write path (emails/draft, linkedin/draft, jobs/discover,
+    // companies/[id]/research) verifies the referenced company/contact
+    // belongs to the caller before using it — this one didn't.
+    const { data: company } = await supabase
+      .from("companies")
+      .select("id")
+      .eq("id", company_id)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (!company) {
+      return NextResponse.json({ error: "Company not found" }, { status: 404 });
+    }
+    if (contact_id) {
+      const { data: contact } = await supabase
+        .from("contacts")
+        .select("id")
+        .eq("id", contact_id)
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (!contact) {
+        return NextResponse.json({ error: "Contact not found" }, { status: 404 });
+      }
+    }
+
     const { data, error } = await supabase
       .from("outreach_emails")
       .insert({
@@ -78,9 +104,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ success: true, email: data });
   } catch (err: unknown) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Internal Server Error" },
-      { status: 500 }
-    );
+    return handleApiError(err);
   }
 }
