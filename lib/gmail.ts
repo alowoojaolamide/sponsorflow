@@ -151,43 +151,66 @@ function base64UrlEncode(str: string): string {
 }
 
 /** Sends an email via the Gmail API using a valid access token. */
+export type EmailAttachment = { filename: string; mimeType: string; content: Buffer };
+
 export async function sendGmailMessage(
   accessToken: string,
   fromEmail: string,
   toEmail: string,
   subject: string,
   body: string,
-  htmlBody?: string
+  htmlBody?: string,
+  attachment?: EmailAttachment
 ): Promise<{ id: string; threadId: string }> {
-  const boundary = `sponsorflow_${Math.random().toString(36).slice(2)}`;
+  const altBoundary = `sponsorflow_alt_${Math.random().toString(36).slice(2)}`;
 
-  const rawMessage = htmlBody
+  // The body itself: plain text alone, or multipart/alternative (plain +
+  // html) when a tracked-link HTML version is available.
+  const bodyPart = htmlBody
     ? [
-        `From: ${fromEmail}`,
-        `To: ${toEmail}`,
-        `Subject: ${subject}`,
-        `Content-Type: multipart/alternative; boundary="${boundary}"`,
+        `Content-Type: multipart/alternative; boundary="${altBoundary}"`,
         "",
-        `--${boundary}`,
+        `--${altBoundary}`,
         "Content-Type: text/plain; charset=utf-8",
         "",
         body,
         "",
-        `--${boundary}`,
+        `--${altBoundary}`,
         "Content-Type: text/html; charset=utf-8",
         "",
         htmlBody,
         "",
-        `--${boundary}--`,
+        `--${altBoundary}--`,
       ].join("\r\n")
-    : [
-        `From: ${fromEmail}`,
-        `To: ${toEmail}`,
-        `Subject: ${subject}`,
-        "Content-Type: text/plain; charset=utf-8",
-        "",
-        body,
-      ].join("\r\n");
+    : ["Content-Type: text/plain; charset=utf-8", "", body].join("\r\n");
+
+  const headers = [`From: ${fromEmail}`, `To: ${toEmail}`, `Subject: ${subject}`];
+
+  let rawMessage: string;
+  if (attachment) {
+    // Wrap the body (plain, or plain+html) as one part of a multipart/mixed
+    // envelope alongside the base64-encoded attachment as a second part.
+    const mixedBoundary = `sponsorflow_mixed_${Math.random().toString(36).slice(2)}`;
+    const encodedFilename = `=?UTF-8?B?${Buffer.from(attachment.filename).toString("base64")}?=`;
+    rawMessage = [
+      ...headers,
+      `Content-Type: multipart/mixed; boundary="${mixedBoundary}"`,
+      "",
+      `--${mixedBoundary}`,
+      bodyPart,
+      "",
+      `--${mixedBoundary}`,
+      `Content-Type: ${attachment.mimeType}; name="${encodedFilename}"`,
+      `Content-Disposition: attachment; filename="${encodedFilename}"`,
+      "Content-Transfer-Encoding: base64",
+      "",
+      attachment.content.toString("base64").replace(/(.{76})/g, "$1\r\n"),
+      "",
+      `--${mixedBoundary}--`,
+    ].join("\r\n");
+  } else {
+    rawMessage = [...headers, bodyPart].join("\r\n");
+  }
 
   const res = await fetch("https://www.googleapis.com/gmail/v1/users/me/messages/send", {
     method: "POST",

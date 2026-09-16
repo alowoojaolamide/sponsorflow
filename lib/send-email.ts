@@ -1,8 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { Database } from "@/types/database";
-import { getValidAccessToken, sendGmailMessage } from "@/lib/gmail";
+import { getValidAccessToken, sendGmailMessage, type EmailAttachment } from "@/lib/gmail";
 import { checkAndConsumeSendLimit, releaseSendLimit } from "@/lib/rate-limit";
 import { buildTrackedHtmlBody } from "@/lib/email-tracking";
+import { downloadResume, guessResumeMimeType } from "@/lib/resume-storage";
 
 type DB = SupabaseClient<Database>;
 
@@ -39,7 +40,7 @@ export async function sendOutreachEmail(supabase: DB, userId: string, emailId: s
   try {
     const { data: profile } = await supabase
       .from("user_profiles")
-      .select("portfolio_url, linkedin_url")
+      .select("portfolio_url, linkedin_url, resume_storage_path, resume_filename")
       .eq("user_id", userId)
       .maybeSingle();
 
@@ -48,13 +49,25 @@ export async function sendOutreachEmail(supabase: DB, userId: string, emailId: s
       linkedinUrl: profile?.linkedin_url,
     });
 
+    let attachment: EmailAttachment | undefined;
+    if (profile?.resume_storage_path && profile.resume_filename) {
+      try {
+        const content = await downloadResume(supabase, profile.resume_storage_path);
+        attachment = { filename: profile.resume_filename, mimeType: guessResumeMimeType(profile.resume_filename), content };
+      } catch {
+        // Don't let a storage hiccup block sending — the email still goes
+        // out, just without the attachment this one time.
+      }
+    }
+
     const sent = await sendGmailMessage(
       gmail.accessToken,
       gmail.connection.gmail_email,
       email.to_email,
       email.subject,
       email.body,
-      htmlBody
+      htmlBody,
+      attachment
     );
 
     await supabase

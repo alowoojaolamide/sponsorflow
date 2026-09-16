@@ -5,6 +5,8 @@ import { extractTextFromFile, extractTextFromUrl } from "@/lib/document-extract"
 import { autofillProfileFromDocuments, isAutofillConfigured } from "@/lib/profile-autofill";
 import { checkAndConsumeAiCall } from "@/lib/rate-limit";
 import { handleApiError } from "@/lib/api-helpers";
+import { ensureProfileRow } from "@/lib/db";
+import { uploadResume } from "@/lib/resume-storage";
 
 export async function POST(req: Request) {
   const auth = await requireUser();
@@ -57,7 +59,21 @@ export async function POST(req: Request) {
       result.profile.portfolio_url = portfolioUrl;
     }
 
-    return NextResponse.json(result);
+    // Persist the actual file too (not just its extracted text) so it can
+    // later be attached to outreach emails — best-effort, since the
+    // autofill result itself is the important part of this response.
+    let resumeSaved = false;
+    if (resumeFile && typeof resumeFile !== "string") {
+      try {
+        const row = await ensureProfileRow(supabase, user.id);
+        await uploadResume(supabase, user.id, row.id, resumeFile, row.resume_storage_path);
+        resumeSaved = true;
+      } catch {
+        // Non-fatal — the extracted profile data is still returned below.
+      }
+    }
+
+    return NextResponse.json({ ...result, resume_saved: resumeSaved });
   } catch (err: unknown) {
     return handleApiError(err);
   }

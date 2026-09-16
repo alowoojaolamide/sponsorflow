@@ -106,6 +106,9 @@ export type Database = {
           example_phrases: string | null;
           onboarding_complete: boolean;
           profile_complete_percent: number;
+          resume_storage_path: string | null;
+          resume_filename: string | null;
+          resume_uploaded_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -128,6 +131,9 @@ export type Database = {
           example_phrases?: string | null;
           onboarding_complete?: boolean;
           profile_complete_percent?: number;
+          resume_storage_path?: string | null;
+          resume_filename?: string | null;
+          resume_uploaded_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -150,6 +156,9 @@ export type Database = {
           example_phrases?: string | null;
           onboarding_complete?: boolean;
           profile_complete_percent?: number;
+          resume_storage_path?: string | null;
+          resume_filename?: string | null;
+          resume_uploaded_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
