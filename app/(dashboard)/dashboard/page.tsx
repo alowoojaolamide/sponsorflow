@@ -2,8 +2,8 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { DashboardStats } from "@/components/dashboard/DashboardStats";
-import { VolumeStats } from "@/components/dashboard/VolumeStats";
+import { DashboardStats, type DashboardStatsSummary } from "@/components/dashboard/DashboardStats";
+import { VolumeStats, type VolumeStatsSummary } from "@/components/dashboard/VolumeStats";
 import { ActivityChart } from "@/components/dashboard/ActivityChart";
 import { IndustryBreakdownChart } from "@/components/dashboard/IndustryBreakdownChart";
 import { RecentJobsList } from "@/components/dashboard/RecentJobsList";
@@ -15,13 +15,28 @@ type ProfileSummary = {
   profile: { profile_complete_percent: number; onboarding_complete: boolean } | null;
 };
 
+type FullSummary = DashboardStatsSummary &
+  VolumeStatsSummary & {
+    by_industry: { industry: string; companies: number }[];
+    daily_activity: { date: string; emails_sent: number; jobs_discovered: number }[];
+    recent_jobs: { id: string; title: string; company_name: string; location: string | null; url: string | null; discovered_at: string }[];
+    recent_drafts: { id: string; subject: string; company_name: string; status: string; created_at: string }[];
+  };
+
 export default function DashboardHomePage() {
   const [profile, setProfile] = useState<ProfileSummary | null>(null);
   const [companyCount, setCompanyCount] = useState<number | null>(null);
+  const [summary, setSummary] = useState<FullSummary | null>(null);
 
   useEffect(() => {
     fetch("/api/profile").then((res) => res.json()).then(setProfile);
     fetch("/api/companies").then((res) => res.json()).then((d) => setCompanyCount(d.total ?? 0));
+    // Fetched once here and passed down to every widget below instead of
+    // each of the 6 independently calling /api/analytics on its own.
+    fetch("/api/analytics")
+      .then((res) => (res.ok ? res.json() : null))
+      .then(setSummary)
+      .catch(() => {});
   }, []);
 
   return (
@@ -56,19 +71,25 @@ export default function DashboardHomePage() {
         </Card>
       )}
 
-      <VolumeStats />
-      <DashboardStats />
+      <VolumeStats summary={summary} />
+      <DashboardStats summary={summary} />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
-          <ActivityChart />
+          {/* `summary ? summary.X : null` (not `summary?.X`, which would be
+              `undefined` while still loading) — these components treat
+              `undefined` as "no prop passed, fetch your own copy" and
+              anything else, including `null`, as "shared data is coming
+              from the parent, wait for it" so they don't each fire their
+              own /api/analytics call during the initial loading window. */}
+          <ActivityChart data={summary ? summary.daily_activity : null} />
         </div>
-        <IndustryBreakdownChart />
+        <IndustryBreakdownChart industries={summary ? summary.by_industry : null} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <RecentJobsList />
-        <RecentDraftsList />
+        <RecentJobsList jobs={summary ? summary.recent_jobs : null} />
+        <RecentDraftsList drafts={summary ? summary.recent_drafts : null} />
       </div>
 
       <div className="flex flex-wrap gap-3">

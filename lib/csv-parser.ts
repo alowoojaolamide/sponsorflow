@@ -70,8 +70,30 @@ export function normalizeCompanyName(raw: string | null | undefined): string {
   return cleaned;
 }
 
+// Fallback for a header that isn't an exact match above — e.g. "Company_Name",
+// "Corp", "Careers Link" — checked in this order (most specific field first)
+// so a broad token like "name" only ever wins as a last resort. Each header
+// only needs to CONTAIN one of these substrings, not equal it, so it survives
+// punctuation/casing/wording variants the exact dictionary can't anticipate.
+const FUZZY_TOKENS: [keyof Omit<ParsedCompany, "normalized_name">, string[]][] = [
+  ["website", ["website", "web site", "domain", "url", "homepage"]],
+  ["career_page", ["career", "job board", "jobs page", "hiring page"]],
+  ["industry", ["industr", "sector", "categor", "vertical"]],
+  ["sponsor_status", ["sponsor status", "rating", "licence", "license", "compliance"]],
+  ["personalization_hook", ["hook", "note", "description", "comment", "remark"]],
+  ["company_name", ["compan", "employer", "sponsor", "business", "firm", "organi", "org", "client", "corp", "name"]],
+];
+
+function fuzzyMapColumn(normalized: string): keyof Omit<ParsedCompany, "normalized_name"> | null {
+  for (const [field, tokens] of FUZZY_TOKENS) {
+    if (tokens.some((t) => normalized.includes(t))) return field;
+  }
+  return null;
+}
+
 export function mapColumn(headerName: string): keyof Omit<ParsedCompany, "normalized_name"> | null {
-  return COLUMN_MAP[headerName.trim().toLowerCase()] ?? null;
+  const normalized = headerName.trim().toLowerCase();
+  return COLUMN_MAP[normalized] ?? fuzzyMapColumn(normalized.replace(/[^a-z0-9\s]/g, " "));
 }
 
 /** Minimal RFC4180-ish CSV line splitter: handles quoted fields with embedded commas/quotes. */

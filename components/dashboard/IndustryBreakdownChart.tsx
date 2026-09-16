@@ -14,8 +14,8 @@ function titleCase(s: string): string {
   return truncated.charAt(0).toUpperCase() + truncated.slice(1);
 }
 
-export function IndustryBreakdownChart() {
-  const [industries, setIndustries] = useState<IndustryStats[] | null>(null);
+export function IndustryBreakdownChart({ industries: providedIndustries }: { industries?: IndustryStats[] | null }) {
+  const [fetchedIndustries, setFetchedIndustries] = useState<IndustryStats[] | null>(null);
   const gridColor = useCssVarColor("--hairline-light", "#e4e4e7");
   const textColor = useCssVarColor("--shade-50", "#71717a");
   const tooltipBg = useCssVarColor("--canvas-light", "#ffffff");
@@ -23,11 +23,14 @@ export function IndustryBreakdownChart() {
   const inkColor = useCssVarColor("--ink", "#000000");
 
   useEffect(() => {
+    if (providedIndustries !== undefined) return;
     fetch("/api/analytics")
       .then((res) => (res.ok ? res.json() : null))
-      .then((d) => setIndustries((d?.by_industry ?? []).slice(0, 6)))
+      .then((d) => setFetchedIndustries((d?.by_industry ?? []).slice(0, 6)))
       .catch(() => {});
-  }, []);
+  }, [providedIndustries]);
+
+  const industries = providedIndustries !== undefined ? providedIndustries?.slice(0, 6) ?? null : fetchedIndustries;
 
   return (
     <Card className="p-6 h-full flex flex-col">

@@ -24,6 +24,7 @@ export async function GET(req: Request) {
   const researched = researchedParam === "false" ? false : researchedParam === "true" ? true : undefined;
   const hasWebsiteParam = searchParams.get("has_website");
   const hasWebsite = hasWebsiteParam === "false" ? false : hasWebsiteParam === "true" ? true : undefined;
+  const likelyTech = searchParams.get("likely_tech") === "true";
 
   const supabase = createSupabaseRouteClient();
   const { companies, total } = await getCompanies(supabase, user.id, {
@@ -37,6 +38,7 @@ export async function GET(req: Request) {
     scanned,
     researched,
     hasWebsite,
+    likelyTech,
   });
 
   return NextResponse.json({ companies, total, limit, offset });

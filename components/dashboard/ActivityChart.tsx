@@ -18,8 +18,8 @@ import {
 
 type DailyActivity = { date: string; emails_sent: number; jobs_discovered: number };
 
-export function ActivityChart() {
-  const [data, setData] = useState<DailyActivity[] | null>(null);
+export function ActivityChart({ data: providedData }: { data?: DailyActivity[] | null }) {
+  const [fetchedData, setFetchedData] = useState<DailyActivity[] | null>(null);
   const gridColor = useCssVarColor("--hairline-light", "#e4e4e7");
   const textColor = useCssVarColor("--shade-40", "#a1a1aa");
   const tooltipBg = useCssVarColor("--canvas-light", "#ffffff");
@@ -27,11 +27,14 @@ export function ActivityChart() {
   const inkColor = useCssVarColor("--ink", "#000000");
 
   useEffect(() => {
+    if (providedData !== undefined) return;
     fetch("/api/analytics")
       .then((res) => (res.ok ? res.json() : null))
-      .then((d) => setData(d?.daily_activity ?? []))
+      .then((d) => setFetchedData(d?.daily_activity ?? []))
       .catch(() => {});
-  }, []);
+  }, [providedData]);
+
+  const data = providedData !== undefined ? providedData : fetchedData;
 
   const formatted = (data ?? []).map((d) => ({
     ...d,

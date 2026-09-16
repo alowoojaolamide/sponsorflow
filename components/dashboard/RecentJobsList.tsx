@@ -14,15 +14,18 @@ type RecentJob = {
   discovered_at: string;
 };
 
-export function RecentJobsList() {
-  const [jobs, setJobs] = useState<RecentJob[] | null>(null);
+export function RecentJobsList({ jobs: providedJobs }: { jobs?: RecentJob[] | null }) {
+  const [fetchedJobs, setFetchedJobs] = useState<RecentJob[] | null>(null);
 
   useEffect(() => {
+    if (providedJobs !== undefined) return;
     fetch("/api/analytics")
       .then((res) => (res.ok ? res.json() : null))
-      .then((d) => setJobs(d?.recent_jobs ?? []))
+      .then((d) => setFetchedJobs(d?.recent_jobs ?? []))
       .catch(() => {});
-  }, []);
+  }, [providedJobs]);
+
+  const jobs = providedJobs !== undefined ? providedJobs : fetchedJobs;
 
   return (
     <Card className="p-6 h-full flex flex-col">

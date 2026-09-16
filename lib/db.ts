@@ -198,6 +198,16 @@ export function isSortableColumn(value: string): value is SortableColumn {
   return (SORTABLE_COLUMNS as readonly string[]).includes(value);
 }
 
+// Free, zero-AI-cost heuristic for "plausibly a tech company that might
+// hire a product designer" — a single case-insensitive regex matched
+// against company_name in SQL, so it costs nothing to apply even across a
+// 100k+ row company list, unlike the AI-based research/discovery actions.
+// Deliberately a name-based first pass, not a claim of certainty: it's meant
+// to let a batch Research/Discover run be pointed at a plausible subset
+// instead of the whole list, not to definitively classify every company.
+export const LIKELY_TECH_PATTERN =
+  "(tech|software|digital|studio|systems?|platform|saas|paas|fintech|edtech|healthtech|proptech|biotech|cyber|\\bai\\b|\\bml\\b|analytics|robotics|automation|\\bapp\\b|\\bapps\\b|\\bweb\\b|\\bit\\b|cloud|\\bdev\\b|labs?|design|\\bux\\b|\\bui\\b|innovat|ventures?|startup)";
+
 export async function getCompanies(
   supabase: DB,
   userId: string,
@@ -212,6 +222,7 @@ export async function getCompanies(
     scanned?: boolean;
     researched?: boolean;
     hasWebsite?: boolean;
+    likelyTech?: boolean;
   } = {}
 ): Promise<{ companies: Tables<"companies">[]; total: number }> {
   const limit = options.limit ?? 50;
@@ -239,6 +250,9 @@ export async function getCompanies(
     query = query.is("researched_at", null);
   } else if (options.researched === true) {
     query = query.not("researched_at", "is", null);
+  }
+  if (options.likelyTech) {
+    query = query.filter("company_name", "imatch", LIKELY_TECH_PATTERN);
   }
   if (options.hasWebsite === false) {
     query = query.is("website", null);

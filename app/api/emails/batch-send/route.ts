@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { createSupabaseRouteClient } from "@/lib/supabase-server";
 import { requireUser } from "@/lib/auth";
-import { sendOutreachEmail } from "@/lib/send-email";
+import { sendOutreachEmail, type SendResult } from "@/lib/send-email";
 import { handleApiError } from "@/lib/api-helpers";
+import { runWithConcurrency } from "@/lib/utils";
 
 export async function POST(req: Request) {
   const auth = await requireUser();
@@ -20,21 +21,33 @@ export async function POST(req: Request) {
     let sent = 0;
     let failed = 0;
     let rateLimitWarning: string | null = null;
-    const results = [];
+    let stopped = false;
+    const results: SendResult[] = [];
 
-    for (const id of email_ids) {
-      const result = await sendOutreachEmail(supabase, user.id, id);
-      results.push(result);
-      if (result.ok) {
-        sent++;
-      } else {
-        failed++;
-        if (result.error.toLowerCase().includes("limit")) {
-          rateLimitWarning = result.error;
-          break; // stop the batch once a rate limit is hit
+    // Sends a few at a time instead of strictly one-at-a-time — safe now
+    // that checkAndConsumeSendLimit is an atomic DB-level guard (a fixed
+    // race from an earlier pass), so concurrent sends can't blow through
+    // the daily/hourly cap even though several may be in flight when the
+    // limit is first hit.
+    await runWithConcurrency(
+      email_ids as string[],
+      3,
+      (id) => sendOutreachEmail(supabase, user.id, id),
+      (_id, _index, result) => {
+        if (!result) return;
+        results.push(result);
+        if (result.ok) {
+          sent++;
+        } else {
+          failed++;
+          if (result.error.toLowerCase().includes("limit")) {
+            rateLimitWarning = result.error;
+            stopped = true; // stop picking up new sends once the cap is hit
+          }
         }
-      }
-    }
+      },
+      () => stopped
+    );
 
     return NextResponse.json({
       total: email_ids.length,

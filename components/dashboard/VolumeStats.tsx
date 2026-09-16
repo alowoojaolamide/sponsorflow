@@ -5,22 +5,25 @@ import Link from "next/link";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Building2, Radar, Briefcase, FileEdit } from "lucide-react";
 
-type Summary = {
+export type VolumeStatsSummary = {
   companies_total: number;
   companies_scanned: number;
   jobs_discovered_total: number;
   pipeline: { drafted: number };
 };
 
-export function VolumeStats() {
-  const [summary, setSummary] = useState<Summary | null>(null);
+export function VolumeStats({ summary: providedSummary }: { summary?: VolumeStatsSummary | null }) {
+  const [fetchedSummary, setFetchedSummary] = useState<VolumeStatsSummary | null>(null);
 
   useEffect(() => {
+    if (providedSummary !== undefined) return;
     fetch("/api/analytics")
       .then((res) => (res.ok ? res.json() : null))
-      .then(setSummary)
+      .then(setFetchedSummary)
       .catch(() => {});
-  }, []);
+  }, [providedSummary]);
+
+  const summary = providedSummary !== undefined ? providedSummary : fetchedSummary;
 
   const tiles = [
     {

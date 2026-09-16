@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { DashboardStats } from "@/components/dashboard/DashboardStats";
+import { DashboardStats, type DashboardStatsSummary } from "@/components/dashboard/DashboardStats";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { BarChart3, TrendingUp } from "lucide-react";
 
@@ -13,7 +13,7 @@ type IndustryStats = {
   reply_rate: number;
 };
 
-type Summary = {
+type Summary = DashboardStatsSummary & {
   pipeline: {
     targeted: number;
     drafted: number;
@@ -46,7 +46,7 @@ export default function AnalyticsPage() {
         </p>
       </div>
 
-      <DashboardStats />
+      <DashboardStats summary={summary} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>

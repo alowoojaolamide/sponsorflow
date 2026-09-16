@@ -77,6 +77,7 @@ export default function CompaniesPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [websiteFilter, setWebsiteFilter] = useState<"" | "yes" | "no">("");
+  const [likelyTechFilter, setLikelyTechFilter] = useState(false);
   const [sortColumn, setSortColumn] = useState<SortColumn>("company_name");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
 
@@ -100,6 +101,7 @@ export default function CompaniesPage() {
     if (search) params.set("search", search);
     if (statusFilter) params.set("status", statusFilter);
     if (websiteFilter) params.set("has_website", websiteFilter === "yes" ? "true" : "false");
+    if (likelyTechFilter) params.set("likely_tech", "true");
 
     fetch(`/api/companies?${params.toString()}`)
       .then((res) => res.json())
@@ -108,7 +110,7 @@ export default function CompaniesPage() {
         setTotal(data.total ?? 0);
       })
       .finally(() => setLoading(false));
-  }, [page, search, statusFilter, websiteFilter, sortColumn, sortOrder]);
+  }, [page, search, statusFilter, websiteFilter, likelyTechFilter, sortColumn, sortOrder]);
 
   // Drives the "Discover Jobs for All" button's remaining-count hint —
   // refetched whenever the filters or the batch scan's progress change.
@@ -116,11 +118,12 @@ export default function CompaniesPage() {
     const params = new URLSearchParams({ limit: "1", scanned: "false" });
     if (search) params.set("search", search);
     if (statusFilter) params.set("status", statusFilter);
+    if (likelyTechFilter) params.set("likely_tech", "true");
     fetch(`/api/companies?${params.toString()}`)
       .then((res) => res.json())
       .then((data) => setUnscannedCount(data.total ?? 0))
       .catch(() => setUnscannedCount(null));
-  }, [search, statusFilter, batchRunning]);
+  }, [search, statusFilter, likelyTechFilter, batchRunning]);
 
   // Same, for the "Research Companies" button — only companies missing a
   // website need this at all.
@@ -128,11 +131,12 @@ export default function CompaniesPage() {
     const params = new URLSearchParams({ limit: "1", has_website: "false", researched: "false" });
     if (search) params.set("search", search);
     if (statusFilter) params.set("status", statusFilter);
+    if (likelyTechFilter) params.set("likely_tech", "true");
     fetch(`/api/companies?${params.toString()}`)
       .then((res) => res.json())
       .then((data) => setUnresearchedCount(data.total ?? 0))
       .catch(() => setUnresearchedCount(null));
-  }, [search, statusFilter, researchRunning]);
+  }, [search, statusFilter, likelyTechFilter, researchRunning]);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
@@ -190,6 +194,7 @@ export default function CompaniesPage() {
       const params = new URLSearchParams({ limit: String(FETCH_PAGE_SIZE), offset: String(offset), ...extraParams });
       if (search) params.set("search", search);
       if (statusFilter) params.set("status", statusFilter);
+      if (likelyTechFilter) params.set("likely_tech", "true");
       const res = await fetch(`/api/companies?${params.toString()}`);
       const data = await res.json();
       const batch: Company[] = data.companies ?? [];
@@ -548,6 +553,21 @@ export default function CompaniesPage() {
               <option value="yes">Has website</option>
               <option value="no">No website</option>
             </select>
+            <label
+              className="flex items-center gap-1.5 min-h-[40px] px-3 rounded-md border border-hairline-light bg-canvas-light text-sm text-ink cursor-pointer"
+              title="Matches company names containing tech-adjacent words (software, digital, design, studio, SaaS, etc.) — a free, imperfect first pass to avoid spending AI research/discovery credit on companies that clearly aren't tech."
+            >
+              <input
+                type="checkbox"
+                checked={likelyTechFilter}
+                onChange={(e) => {
+                  setLikelyTechFilter(e.target.checked);
+                  setPage(0);
+                }}
+                className="rounded border-hairline-light"
+              />
+              Likely tech only
+            </label>
           </div>
         </CardHeader>
         <CardContent>

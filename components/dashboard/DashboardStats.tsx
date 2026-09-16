@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Send, MailOpen, MessageSquare, Calendar } from "lucide-react";
 
-type Summary = {
+export type DashboardStatsSummary = {
   emails_sent_today: number;
   daily_limit: number;
   open_rate: number;
@@ -12,15 +12,23 @@ type Summary = {
   interviews_scheduled: number;
 };
 
-export function DashboardStats() {
-  const [summary, setSummary] = useState<Summary | null>(null);
+/**
+ * Accepts an already-fetched `summary` (so a page rendering several of
+ * these analytics widgets together can fetch /api/analytics once and pass
+ * it down) — falls back to fetching its own copy when used standalone.
+ */
+export function DashboardStats({ summary: providedSummary }: { summary?: DashboardStatsSummary | null }) {
+  const [fetchedSummary, setFetchedSummary] = useState<DashboardStatsSummary | null>(null);
 
   useEffect(() => {
+    if (providedSummary !== undefined) return;
     fetch("/api/analytics")
       .then((res) => (res.ok ? res.json() : null))
-      .then(setSummary)
+      .then(setFetchedSummary)
       .catch(() => {});
-  }, []);
+  }, [providedSummary]);
+
+  const summary = providedSummary !== undefined ? providedSummary : fetchedSummary;
 
   const stats = [
     {

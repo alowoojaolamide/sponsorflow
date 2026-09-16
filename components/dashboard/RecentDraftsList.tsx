@@ -13,15 +13,18 @@ type RecentDraft = {
   created_at: string;
 };
 
-export function RecentDraftsList() {
-  const [drafts, setDrafts] = useState<RecentDraft[] | null>(null);
+export function RecentDraftsList({ drafts: providedDrafts }: { drafts?: RecentDraft[] | null }) {
+  const [fetchedDrafts, setFetchedDrafts] = useState<RecentDraft[] | null>(null);
 
   useEffect(() => {
+    if (providedDrafts !== undefined) return;
     fetch("/api/analytics")
       .then((res) => (res.ok ? res.json() : null))
-      .then((d) => setDrafts(d?.recent_drafts ?? []))
+      .then((d) => setFetchedDrafts(d?.recent_drafts ?? []))
       .catch(() => {});
-  }, []);
+  }, [providedDrafts]);
+
+  const drafts = providedDrafts !== undefined ? providedDrafts : fetchedDrafts;
 
   return (
     <Card className="p-6 h-full flex flex-col">
